@@ -17,7 +17,7 @@ Compare o milheiro da emissão com o valor da sua régua para o programa que emi
 
 - **Milheiro da emissão ACIMA do valor da régua:** as milhas valem mais nesta emissão do que custam para repor. Favorável a emitir com milhas que você já tem; comprar pontos para emitir também é razoável. Exemplo com números inventados: milheiro de R$ 50 contra régua de R$ 30. Neste caso, 100 mil milhas compradas por R$ 3.000, mais as taxas, cobrem um bilhete que custaria R$ 5.000 além das taxas.
 - **Milheiro da emissão IGUAL ou ABAIXO do valor da régua:** comprar pontos para esta emissão custa mais do que entrega. O padrão é pagar em dinheiro e preservar as milhas. Não recomendar compra de pontos; emitir milhas existentes é exceção, só com critério declarado (ex.: preservar caixa), nunca como "economia".
-- **Programa sem valor na tabela:** o script calcula o milheiro e marca `[FALTA: valor da sua régua]`. A decisão de comprar pontos fica pendente até a pessoa dizer o valor. Nunca sugira um número como se fosse dela.
+- **Programa sem valor na tabela:** o script calcula o milheiro e marca `[FALTA: valor da sua régua]`. A decisão de comprar pontos fica pendente até a pessoa dizer o valor. Os valores que vêm na tabela são médias de referência: diga isso ao usar, sem apresentar como o custo real da pessoa.
 - **Veredito SEMPRE em termos de milheiro** (ex.: "milheiro de R$ 38 contra régua de R$ 30"), nunca como "economia de X%": percentual esconde o custo de repor as milhas.
 - **Bagagem desigual invalida a comparação:** preço listado é SEM bagagem; se a emissão inclui bagagem e o preço em dinheiro não, ajuste antes de dar o veredito (os dois lados com as mesmas regras de bagagem).
 
@@ -31,32 +31,32 @@ Sempre separe a companhia que voa do programa que emite (ex.: voa Emirates, emit
 
 ## Como achar o seu número
 
-O valor da régua é o máximo que você aceita pagar por 1.000 milhas daquele programa. Quem compra milhas ou assina clube olha o que pagou da última vez: valor pago ÷ milhas recebidas × 1.000. Não copie o número de outra pessoa: o preço muda com a promoção, com o clube e com o seu perfil.
+O valor da régua é o máximo que você aceita pagar por 1.000 milhas daquele programa. Quem compra milhas ou assina clube olha o que pagou da última vez: valor pago ÷ milhas recebidas × 1.000. Os valores que vêm na tabela são médias de referência; troque pelos seus, porque o preço muda com a promoção, com o clube e com o seu perfil.
 
 Não quer editar o arquivo? Diga pro Claude "preenche minha régua" e informe os valores. Programa que você não usa pode ficar em branco. Programa que não está na lista pode ganhar uma linha nova, com o nome que o seats.aero usa (ex.: `united`, `turkish`).
 
 ## Sua régua
 
-R$ por 1.000 milhas, valor máximo por programa. Aceita `20`, `20,50` ou `R$ 20,50`.
+R$ por 1.000 milhas, valor máximo por programa. Aceita `20`, `20,50` ou `R$ 20,50`. Já vem com médias de referência de novembro de 2026; troque pelos seus. SUMA são 10 euros, a R$ 6,1317 o euro (06/11/2026).
 
 <!-- regua:inicio -->
 | Programa | Valor máximo (R$ por 1.000) |
 |---|---|
-| Azul | |
-| Smiles | |
-| LATAM Pass | |
-| Avios | |
-| Miles & Go | |
+| Azul | 14 |
+| Smiles | 16 |
+| LATAM Pass | 25 |
+| Avios | 56 |
+| Miles & Go | 35 |
 | Lifemiles | |
-| SUMA | |
-| Aeroplan | |
-| Flying Blue | |
-| Aegean | |
-| JAL | |
+| SUMA | 61,32 |
+| Aeroplan | 70 |
+| Flying Blue | 75 |
+| Aegean | 68 |
+| JAL | 84 |
 | Connectmiles | |
 <!-- regua:fim -->
 
-Última atualização da régua (DD/MM/AAAA):
+Última atualização da régua (DD/MM/AAAA): 08/11/2026
 
 Passados 90 dias dessa data, ou sem data nenhuma, o resultado sai com `[RECONFIRMAR]`: preço de milha muda rápido. O script entende `iberia`, `british` e `qatar` como Avios, `flyingblue` como Flying Blue, `copa` como Connectmiles e `tap` como Miles & Go.
 
@@ -67,20 +67,20 @@ R$ por 1.000 milhas: o que você costuma pagar em cada programa. Serve só pra d
 <!-- preco:inicio -->
 | Programa | Preço de referência (R$ por 1.000) |
 |---|---|
-| LATAM Pass | |
-| Smiles | |
-| Azul | |
-| Avios | |
-| Miles & Go | |
-| Aegean | |
-| Livelo | |
-| Esfera | |
-| Flying Blue | |
-| Aeroplan | |
-| JAL | |
-| AAdvantage | |
-| Skywards | |
-| SUMA | |
+| LATAM Pass | 25 |
+| Smiles | 16 |
+| Azul | 14 |
+| Avios | 56 |
+| Miles & Go | 35 |
+| Aegean | 68 |
+| Livelo | 30 |
+| Esfera | 35 |
+| Flying Blue | 75 |
+| Aeroplan | 70 |
+| JAL | 84 |
+| AAdvantage | 100 |
+| Skywards | 100 |
+| SUMA | 61,32 |
 <!-- preco:fim -->
 
 Comando: `python3 scripts/milheiro.py --estimar --milhas N --taxas T --programa P`. Programa sem valor sai `[FALTA: seu preço de referência]`.

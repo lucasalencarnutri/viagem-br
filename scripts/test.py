@@ -159,16 +159,14 @@ class TestLeituraDaRegua(unittest.TestCase):
         self.assertEqual(ler_regua(PASTA / "nao-existe.md"), Regua({}, None))
         ECOS.clear()
 
-    def test_regua_sai_em_branco_na_distribuicao(self):
-        # ninguém recebe o valor de outra pessoa: 12 programas listados, nenhum preenchido
-        texto = (PASTA / "references" / "regua-milheiro.md").read_text(encoding="utf-8")
-        bloco = re.search(r"<!-- regua:inicio -->(.*?)<!-- regua:fim -->", texto, re.DOTALL).group(1)
-        linhas = [l for l in bloco.splitlines() if l.startswith("| ")]
-        self.assertEqual(len(linhas), 13)  # título + 12 programas
-        self.assertEqual(ler_regua().valores, {})
+    def test_regua_vem_com_medias_de_referencia(self):
+        v = ler_regua().valores
+        esperado = {"azul": 14, "smiles": 16, "latam": 25, "avios": 56, "miles_go": 35,
+                    "suma": 61.32, "aeroplan": 70, "flying_blue": 75, "aegean": 68, "jal": 84}
+        self.assertEqual(v, esperado)  # Lifemiles e Connectmiles ficam sem valor
 
-    def test_data_em_branco_na_distribuicao(self):
-        self.assertIsNone(ler_regua().atualizada_em)
+    def test_data_das_medias(self):
+        self.assertEqual(ler_regua().atualizada_em, date(2026, 11, 8))
 
 
 class TestEstimativaEmReais(unittest.TestCase):
@@ -206,11 +204,13 @@ class TestEstimativaEmReais(unittest.TestCase):
                            "| Azul | |\n<!-- preco:fim -->\n", encoding="utf-8")
             self.assertEqual(ler_precos(arq), {"smiles": 11.0})
 
-    def test_tabela_de_precos_sai_em_branco_na_distribuicao(self):
-        texto = (PASTA / "references" / "regua-milheiro.md").read_text(encoding="utf-8")
-        bloco = re.search(r"<!-- preco:inicio -->(.*?)<!-- preco:fim -->", texto, re.DOTALL).group(1)
-        self.assertEqual(len([l for l in bloco.splitlines() if l.startswith("| ")]), 15)  # título + 14
-        self.assertEqual(ler_precos(), {})
+    def test_tabela_de_precos_vem_preenchida(self):
+        p = ler_precos()
+        self.assertEqual(p["smiles"], 16)
+        self.assertEqual(p["livelo"], 30)
+        self.assertEqual(p["american"], 100)
+        self.assertEqual(p["suma"], 61.32)
+        self.assertEqual(len(p), 14)
 
 
 class TestTravaDeAtualidade(unittest.TestCase):
@@ -311,7 +311,7 @@ class TestCliMilheiro(unittest.TestCase):
         return saida.getvalue()
 
     def test_sem_regua_preenchida(self):
-        saida = self.rodar("--cash", "R$ 5.546,50", "--taxas", "546,50", "--milhas", "50.000", "--programa", "Smiles")
+        saida = self.rodar("--cash", "R$ 5.546,50", "--taxas", "546,50", "--milhas", "50.000", "--programa", "lifemiles")
         self.assertIn("R$ 100,00/milheiro", saida)
         self.assertIn(FALTA_REGUA, saida)
 
@@ -334,7 +334,7 @@ class TestCliEstimar(unittest.TestCase):
         return saida.getvalue()
 
     def test_estimar_nao_exige_preco_em_dinheiro(self):
-        saida = self.rodar("--estimar", "--milhas", "70.800", "--taxas", "245,36", "--programa", "Smiles")
+        saida = self.rodar("--estimar", "--milhas", "70.800", "--taxas", "245,36", "--programa", "lifemiles")
         self.assertIn(FALTA_PRECO, saida)
 
     def test_sem_estimar_exige_dinheiro_e_taxas(self):

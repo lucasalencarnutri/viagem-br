@@ -136,13 +136,13 @@ cd ~/.claude/skills/viagem-br && python3 scripts/test.py
 
 Deu certo se terminar com `OK`.
 
-## Preencha a sua régua
+## Ajuste a sua régua
 
-A tabela vem em branco de propósito, porque esse número depende de como você compra milhas. Sem preencher, a skill faz a conta do milheiro e escreve `[FALTA: valor da sua régua]` no lugar da comparação.
+A tabela já vem com médias de referência de novembro de 2026, então a skill funciona de cara. Troque pelos seus valores, porque esse número depende de como você compra milhas. Programa sem valor sai `[FALTA: valor da sua régua]` no lugar da comparação.
 
-Pra preencher, diga pro Claude "preenche minha régua do milheiro" e informe os valores. Ou abra o arquivo `~/.claude/skills/viagem-br/references/regua-milheiro.md` num editor de texto e complete a tabela "Sua régua" e a data.
+Pra ajustar, diga pro Claude "preenche minha régua do milheiro" e informe os valores. Ou abra o arquivo `~/.claude/skills/viagem-br/references/regua-milheiro.md` num editor de texto e complete a tabela "Sua régua" e a data.
 
-A mesma página tem uma segunda tabela, opcional: "Seu preço de referência", com o que você costuma pagar por 1.000 milhas. Com ela, a skill diz quanto a emissão fica em reais, mais ou menos. Sem ela, escreve `[FALTA: seu preço de referência]`. O veredito não muda.
+A mesma página tem uma segunda tabela, também já preenchida com médias: "Seu preço de referência", com o que se costuma pagar por 1.000 milhas. Com ela, a skill diz quanto a emissão fica em reais, mais ou menos. Sem ela, escreve `[FALTA: seu preço de referência]`. O veredito não muda.
 
 Como achar o seu número: olhe sua última compra de milhas ou seu clube e faça valor pago ÷ milhas recebidas × 1.000. Exemplo com números inventados: R$ 600 por 20.000 milhas dá R$ 30 por 1.000.
 

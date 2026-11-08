@@ -88,7 +88,7 @@ Cada bloco é um título de nível 2 (`## AVISOS`, `## TABELA`, `## VEREDITO`, `
 - **Só monitoramento:** apenas os Passos 8 e 9, baseline de track e leitura de tendência.
 - **Só a data mais barata:** apenas os Passos 2 e 3.
 - **Só comparação de cabine:** apenas os Passos 4 e 6.
-- **Preencher a régua:** pergunte o valor de cada programa que a pessoa usa, grave na tabela "Sua régua" de `references/regua-milheiro.md` e preencha a data da última atualização. Se ela souber quanto costuma pagar, grave também em "Seu preço de referência". Não invente nem sugira número.
+- **Preencher a régua:** pergunte o valor de cada programa que a pessoa usa, grave na tabela "Sua régua" de `references/regua-milheiro.md` e preencha a data da última atualização. Se ela souber quanto costuma pagar, grave também em "Seu preço de referência". Enquanto ela não mudar, valem as médias de referência que vêm nas tabelas: diga no resultado que são médias.
 
 ## CRITÉRIOS DE DECISÃO
 
@@ -105,7 +105,7 @@ Cada bloco é um título de nível 2 (`## AVISOS`, `## TABELA`, `## VEREDITO`, `
 - Tratar preço ou disponibilidade como permanente: "sujeito a disponibilidade", sempre.
 - Dizer "melhor voo" sem declarar o critério. Compare cenários.
 - Prometer preço que não veio de uma chamada desta conversa.
-- Sugerir valor de régua ou preço de referência como se fosse da pessoa, ou preencher essas tabelas sem ela dizer o número.
+- Apresentar a média de referência como se fosse o custo real da pessoa, ou mudar essas tabelas sem ela dizer o número.
 - Errar fato técnico de programa: Emirates NÃO emite por Avios (emite por Smiles e Azul pelo Mundo); LATAM não é Oneworld (saiu em 2020); Etihad emite por Azul pelo Mundo; Turkish emite por Smiles e Azul pelo Mundo.
 - Recomendar emissão só porque o preço em dinheiro caiu: a decisão é do programa que a pessoa tem, e o preço é uma das entradas.
 - Hipérbole, "hack", "segredo", "game changer" na resposta.
