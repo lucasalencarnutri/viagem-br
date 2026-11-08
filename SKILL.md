@@ -1,6 +1,6 @@
 ---
 name: viagem-br
-description: Pesquisa de voos e milhas para quem viaja a partir do Brasil, com os MCPs google-flights e seats-aero. Use quando a pessoa perguntar sobre rota, preço de passagem, emissão em milhas (Smiles, Azul, Avios, pontos Livelo ou Esfera), milheiro de uma emissão, "como tá GRU-NRT", melhor data para voar, comparação dinheiro × milhas, cabine, conexões ou monitoramento de tarifa, ou pedir pra preencher a régua do milheiro. Não usar para pesquisa de hotéis, montagem de roteiro de viagem ou lista de promoções de transferência do dia.
+description: Pesquisa de voos e milhas para quem viaja a partir do Brasil, com os MCPs google-flights e seats-aero. Use quando a pessoa perguntar sobre rota, preço de passagem, emissão em milhas (Smiles, Azul, Avios, pontos Livelo ou Esfera), milheiro de uma emissão, "como tá GRU-NRT", melhor data para voar, comparação dinheiro × milhas, cabine, conexões ou monitoramento de tarifa, ou pedir pra preencher a régua do milheiro. Também busca hotel pelo Trivago, quando conectado. Não usar para montagem de roteiro de viagem ou lista de promoções de transferência do dia.
 ---
 
 # Viagem BR: pesquisa de voos e milhas
@@ -97,6 +97,10 @@ Cada bloco é um título de nível 2 (`## AVISOS`, `## TABELA`, `## VEREDITO`, `
 - A decisão nunca é só preço: duração total, risco e duração de conexão, horário de chegada, aeroporto alternativo. Flexibilidade vence otimização máxima.
 - Custo total da viagem, não do voo: voos internos em dinheiro, taxa de devolução de carro em outra cidade e deslocamento entre aeroportos entram na comparação entre cenários de roteiro.
 - Veredito antes da justificativa.
+
+## Hotel (opcional)
+
+Se a pessoa pedir hotel e o MCP `trivago` estiver conectado, siga `references/hoteis-trivago.md`. Mostre o preço total da estadia, a condição da oferta e a data da consulta, em bloco separado do voo. Sem o MCP, avise e não invente preço.
 
 ## PROIBIDO
 

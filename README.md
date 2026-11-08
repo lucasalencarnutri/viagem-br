@@ -112,7 +112,7 @@ claude mcp login seats-aero
 
 Sem login, o seats.aero só enxerga os próximos 60 dias e esconde a Azul. Pra ver mais longe e ver a Azul, a sua conta precisa do plano Pro. Confira preço e condições no site do seats.aero no dia em que for assinar, porque isso muda. Não quer assinar? Pule o login: a skill funciona dentro desses limites e avisa o que ficou de fora.
 
-### Passo 6: Kiwi e Skiplagged (opcional)
+### Passo 6: Kiwi, Skiplagged e Trivago (opcional)
 
 ```bash
 claude mcp add --transport http --scope user kiwi https://mcp.kiwi.com
@@ -120,6 +120,12 @@ claude mcp add --transport http --scope user kiwi https://mcp.kiwi.com
 
 ```bash
 claude mcp add --transport http --scope user skiplagged https://mcp.skiplagged.com/mcp
+```
+
+O Trivago busca hotel em reais, quando você pedir:
+
+```bash
+claude mcp add --transport http --scope user trivago https://mcp.trivago.com/mcp
 ```
 
 ### Passo 7: conferir

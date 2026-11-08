@@ -344,6 +344,7 @@ class TestCliEstimar(unittest.TestCase):
 
 class TestDocumentacao(unittest.TestCase):
     ARQUIVOS = ["SKILL.md", "README.md", *(f"references/{n}" for n in (
+        "hoteis-trivago.md",
         "armadilhas.md", "extractor-navegador.md", "fatos-programas.md", "regua-milheiro.md", "seats-aero.md"))]
 
     def ler(self, nome):
