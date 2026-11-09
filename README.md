@@ -7,6 +7,7 @@ Skill é um pacote de instruções que ensina o Claude a fazer uma tarefa sempre
 ## O que ela entrega
 
 - Preço em dinheiro e em milhas lado a lado, em econômica e executiva, com quantas opções existem em cada caso.
+- Ida e volta comparada com dois só-ida, e a conta feita em cada sentido: às vezes compensa ir em milhas e voltar em dinheiro.
 - As datas mais baratas da rota, as conexões e o risco de cada uma.
 - A conta do milheiro de cada emissão: (preço em dinheiro − taxas) ÷ milhas × 1.000. Milheiro é quanto cada 1.000 milhas estão valendo naquela passagem.
 - A comparação com a sua régua, que é o valor máximo que você aceita pagar por 1.000 milhas de cada programa.
@@ -18,7 +19,8 @@ Skill é um pacote de instruções que ensina o Claude a fazer uma tarefa sempre
 - **Azul não informa quantos assentos restam.** Viajando em 2 pessoas ou mais, confirme no site da Azul. A busca da Azul também só mostra voo da própria Azul: voo de parceiro pelo Azul pelo Mundo sai como pista, marcado `[conferir preço no site da Azul]`.
 - **O Google Flights não tem API oficial.** O servidor lê a página pública do Google e pode parar sem aviso se o Google mudar o site. Quando isso acontece, a skill marca "sem dado" naquela parte e segue.
 - **O seats.aero é uma foto, não o estoque ao vivo.** O dado tem de horas a dias. Antes de transferir pontos, confira o assento no site do programa, porque transferência não volta.
-- **Sem assinatura Pro do seats.aero, só os próximos 60 dias e a Azul só em parte.** Sem login o serviço é grátis e não pede cadastro, mas recusa datas além de 60 dias e esconde parte dos voos da Azul: em 09/11/2026 ela apareceu em voo dentro do Brasil e pra Lisboa, e não apareceu pra Orlando. Smiles e Iberia aparecem normalmente. A skill avisa quando isso afeta a sua busca.
+- **Sem assinatura Pro do seats.aero, só os próximos 60 dias.** Sem login o serviço é grátis e não pede cadastro, mas recusa datas além de 60 dias. A skill avisa quando isso afeta a sua busca.
+- **O seats.aero esconde emissão com preço muito alto.** Por padrão, emissão de preço dinâmico acima de um limite não aparece, e sem login não dá pra desligar isso. Na Azul, em 09/11/2026, sumiu o que passava de uns 150 mil milhas por trecho. A skill marca "preço alto, escondido pelo seats.aero": existe emissão, e o valor você vê no site do programa.
 - **Voo dentro do Brasil sai sem executiva.** Em rota doméstica a skill só pesquisa executiva se você pedir. Nas milhas, ela olha Smiles e Azul e também programas de fora que emitem Gol, Azul e LATAM, como American, Aeroplan, United, Delta e Virgin Atlantic. Esses só servem se você tem os pontos ou um caminho de transferência.
 - **O seats.aero não diz se o preço é promocional ou tarifa pública.** Com a conta Pro, a skill compara o mesmo voo em outros programas e marca `[provável tarifa pública]`. Sem login essa conferência não existe, e a skill avisa.
 - **Bônus de transferência é com você.** A skill não acompanha promoção. Veja no app do banco o bônus ativo, a proporção e a data limite.
@@ -32,7 +34,7 @@ Skill é um pacote de instruções que ensina o Claude a fazer uma tarefa sempre
 |---|---|---|
 | Claude Code | Plano pago do Claude (Pro ou superior) | É quem roda a skill |
 | Google Flights | Grátis | Preço em dinheiro |
-| seats.aero | Sua própria conta. Sem login: grátis, 60 dias à frente e a Azul só em parte. Pra ver tudo: plano Pro em seu nome | Preço em milhas |
+| seats.aero | Sua própria conta. Sem login: grátis e só 60 dias à frente. Pra ver mais longe: plano Pro em seu nome | Preço em milhas |
 | Kiwi e Skiplagged | Grátis, opcionais | Conferem o preço em outra fonte |
 
 Cada um desses serviços é ligado ao Claude por um servidor MCP. MCP é como uma tomada: liga o Claude a um serviço de fora.
@@ -81,7 +83,7 @@ python3 ~/.claude/skills/viagem-br/scripts/instalar.py --com-opcionais
 
 A skill não vem com conta nem chave de ninguém: cada pessoa usa a própria. Aqui não existe caminho por chave de API, o acesso é só o login da sua conta.
 
-Sem login, o seats.aero só enxerga os próximos 60 dias e mostra a Azul só em parte. Pra ver mais longe e a Azul inteira, a sua conta precisa do plano Pro. Confira preço e condições no site do seats.aero no dia em que for assinar, porque isso muda. Não quer assinar? Pule este passo: a skill funciona dentro desses limites e avisa o que ficou de fora.
+Sem login, o seats.aero só enxerga os próximos 60 dias. Pra ver mais longe, a sua conta precisa do plano Pro. Confira preço e condições no site do seats.aero no dia em que for assinar, porque isso muda. Não quer assinar? Pule este passo: a skill funciona dentro desses limites e avisa o que ficou de fora.
 
 Com o plano Pro, crie a sua conta em seats.aero, com o seu e-mail, e faça o login. Ele abre no seu navegador. Nunca passe senha ou chave sua pro Claude:
 
@@ -182,7 +184,7 @@ Se a skill não entrar sozinha, comece o pedido com `/viagem-br`.
 | Algum servidor com `✘` ou sem `✔ Connected` | Confira a internet e rode o instalador com `--conferir`, que diz o que falta |
 | "No flight data found" ou "changed the response format" | O Google bloqueou ou mudou a página. Espere alguns minutos e peça de novo |
 | `anonymous searches must use dates from` | Sem login Pro, o seats.aero só enxerga 60 dias à frente |
-| A Azul não aparece nas milhas | Sem login Pro, o seats.aero esconde parte dos voos da Azul |
+| A Azul não aparece nas milhas | O seats.aero esconde emissão com preço muito alto, e a Azul cai muito nisso. Veja o valor no site da Azul |
 
 ## Atualizar
 

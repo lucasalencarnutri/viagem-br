@@ -13,8 +13,9 @@ Servidores:
   google-flights  o binário `google-flights-mcp` do PATH ou a pasta do README
                   (~/mcp/google-flights-mcp/dist/index.js).
   seats-aero      o MCP oficial, https://seats.aero/mcp, sem login: a ponte não
-                  autentica, então só enxerga os próximos 60 dias e mostra a
-                  Azul só em parte. Pra ver tudo, use o MCP nativo com conta Pro (README).
+                  autentica, então só enxerga os próximos 60 dias. Por padrão o
+                  seats.aero esconde emissão com preço muito alto, e sem login não dá
+                  pra desligar. Pra ver mais longe, use o MCP nativo com conta Pro (README).
 
 Outro caminho de servidor: variável VIAGEM_BR_CMD_<SERVIDOR> com o comando em
 lista JSON, ex.: VIAGEM_BR_CMD_GOOGLE_FLIGHTS='["/caminho/google-flights-mcp"]'.
@@ -41,8 +42,8 @@ AMBIENTE_PERMITIDO = ("PATH", "HOME", "USER", "LOGNAME", "SHELL", "TMPDIR", "TEM
                       "http_proxy", "https_proxy", "no_proxy", "PLAYWRIGHT_BROWSERS_PATH", "SYSTEMROOT", "SystemRoot",
                       "WINDIR", "USERPROFILE", "APPDATA", "LOCALAPPDATA", "PROGRAMFILES", "ProgramFiles", "COMSPEC",
                       "PATHEXT")
-AVISO_SEM_LOGIN = (">> ponte sem login: o seats.aero só enxerga os próximos 60 dias e mostra a "
-                   "Azul só em parte. Pra ver tudo, use o MCP nativo com conta Pro.")
+AVISO_SEM_LOGIN = (">> ponte sem login: o seats.aero só enxerga os próximos 60 dias e esconde emissão "
+                   "com preço muito alto. Pra ver mais longe, use o MCP nativo com conta Pro.")
 
 
 def comando(servidor: str):

@@ -730,10 +730,11 @@ class TestDocumentacao(unittest.TestCase):
             with self.subTest(arquivo=nome):
                 self.assertIn("MUDANCAS.md", self.ler(nome))
 
-    def test_nenhum_texto_diz_que_a_azul_some_sem_login(self):
-        # 2026-11-09: sem login a Azul apareceu em rota doméstica e pra Lisboa. Ela aparece em parte.
-        frases = ("não mostra a Azul", "esconde a Azul", "sem a Azul", "esconde os voos da Azul")
-        arquivos = [*self.ARQUIVOS, "scripts/ponte_mcp.py", "scripts/instalar.py"]
+    def test_textos_explicam_o_filtro_de_preco_e_nao_culpam_o_login(self):
+        # 2026-11-09 à noite: o que some é emissão dinâmica cara demais (filtro do seats.aero), e não a Azul.
+        # Medido: Azul pra Lisboa, sem login até 149 mil; numa conta Pro, a mesma busca foi até 900 mil.
+        frases = ("não mostra a Azul", "esconde a Azul", "sem a Azul", "esconde os voos da Azul", "Azul só em parte")
+        arquivos = [a for a in self.ARQUIVOS if a != "MUDANCAS.md"] + ["scripts/ponte_mcp.py", "scripts/instalar.py"]
         for nome in arquivos:
             texto = self.ler(nome)
             for frase in frases:
@@ -741,7 +742,47 @@ class TestDocumentacao(unittest.TestCase):
                     self.assertNotIn(frase, texto)
         for nome in ("SKILL.md", "README.md", "references/seats-aero.md", "scripts/ponte_mcp.py"):
             with self.subTest(arquivo=nome):
-                self.assertIn("Azul só em parte", self.ler(nome))
+                self.assertIn("esconde emissão", self.ler(nome))
+        armadilhas = self.ler("references/armadilhas.md")
+        for trecho in ("docs.seats.aero", "149 mil", "900 mil", "Disable Dynamic Filtering"):
+            with self.subTest(trecho=trecho):
+                self.assertIn(trecho, armadilhas)
+        self.assertIn("armadilha 41", self.ler("SKILL.md"))
+
+    def test_filtered_nao_vira_sem_estoque_nem_sem_login(self):
+        skill = self.ler("SKILL.md")
+        self.assertIn("preço alto, escondido pelo seats.aero", skill)
+        self.assertNotIn("Azul `filtered` sem login", skill)
+
+    def test_metodo_compara_ida_e_volta_com_dois_so_ida(self):
+        skill = self.ler("SKILL.md")
+        for trecho in ("dois só-ida", "conta por sentido", "armadilha 42", "dois bilhetes", "misto"):
+            with self.subTest(trecho=trecho):
+                self.assertIn(trecho, skill)
+        armadilhas = self.ler("references/armadilhas.md")
+        for trecho in ("R$ 867", "R$ 5.488", "R$ 2.154"):  # as duas medições de 2026-11-09
+            with self.subTest(trecho=trecho):
+                self.assertIn(trecho, armadilhas)
+
+    def test_ajustes_da_pesquisa_de_orlando(self):
+        # pesquisa de ponta a ponta de 2026-11-09, Campinas⇄Orlando, sem login
+        skill = self.ler("SKILL.md")
+        for trecho in ("`maxResults` até 10", "um sentido basta", "mesmo voo da emissão", "não é programa de emissão",
+                       "numa chamada de conferência por programa", "sem RESTRICOES, 1", "Em outra cidade o código não foi testado",
+                       "da CABINE da ENTRADA traz o menor", "sem nenhuma emissão com número"):
+            with self.subTest(trecho=trecho):
+                self.assertIn(trecho, skill)
+        armadilhas = self.ler("references/armadilhas.md")
+        for trecho in ("VCP→ORL", "R$ 158 mil", "aceita no máximo 10"):
+            with self.subTest(trecho=trecho):
+                self.assertIn(trecho, armadilhas)
+
+    def test_metodo_consulta_as_rotas_monitoradas(self):
+        skill = self.ler("SKILL.md")
+        self.assertIn("`list_routes`", skill)
+        self.assertIn("sem dado: rota não monitorada pelo seats.aero", skill)
+        self.assertIn("`list_routes`", skill.split("## Rota doméstica")[1].split("\n## ")[0])
+        self.assertIn("| Rotas monitoradas |", self.ler("references/seats-aero.md"))
 
     def test_metodo_tem_a_rota_domestica(self):
         skill = self.ler("SKILL.md")
@@ -906,6 +947,22 @@ class TestAudit(unittest.TestCase):
                     self.assertRaises(SystemExit) as fim, contextlib.redirect_stdout(io.StringIO()):
                 audit.main()
         self.assertEqual(fim.exception.code, 0)
+
+    def so_com(self, marcador):
+        """SAÍDA em que a única linha de `milhas × executiva` traz só esse marcador."""
+        linhas = [l for l in self.bom.splitlines() if not (l.startswith("|") and "LATAM Pass" in l)]
+        return "\n".join(linhas).replace("390k milhas + R$ 350 · 2 voos", marcador)
+
+    def test_marcador_de_preco_alto_escondido(self):
+        # 2026-11-09: `filtered` é emissão dinâmica cara que o seats.aero esconde, não falta de assento
+        self.assertEqual(audit.auditar(self.so_com("preço alto, escondido pelo seats.aero")), [])
+
+    def test_marcador_de_rota_nao_monitorada(self):
+        self.assertEqual(audit.auditar(self.so_com("sem dado: rota não monitorada pelo seats.aero")), [])
+
+    def test_marcador_inventado_continua_reprovado(self):
+        viol = audit.auditar(self.so_com("não achei nada"))
+        self.assertTrue(any("milhas × executiva" in v for v in viol))
 
     def test_celula_sem_login_ok(self):
         viol = audit.auditar(

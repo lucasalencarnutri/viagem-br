@@ -1,10 +1,12 @@
 # seats.aero: como o servidor funciona
 
-O servidor é o MCP oficial, `https://seats.aero/mcp`, e cada pessoa usa a própria conta. Medido em 2026-11-01; login, recorte por banco e `max_fees` revistos em 2026-11-07; limites de conta conferidos em 2026-11-08; lista de programas, Azul sem login e rota doméstica, em 2026-11-09. Mudou o servidor: re-testar e atualizar com data.
+O servidor é o MCP oficial, `https://seats.aero/mcp`, e cada pessoa usa a própria conta. Medido em 2026-11-01; login, recorte por banco e `max_fees` revistos em 2026-11-07; limites de conta conferidos em 2026-11-08; lista de programas, rota doméstica, filtro de preço e rotas monitoradas, em 2026-11-09. Mudou o servidor: re-testar e atualizar com data.
 
 | Item | Como funciona |
 |---|---|
-| Sem login | De graça e sem cadastro: só voos dos próximos 60 dias, a Azul só em parte (armadilha 24), sem busca ao vivo e sem alerta, limite de 1.000 requisições por IP por dia. Data fora dos 60 dias dá erro (armadilha 24) |
+| Sem login | De graça e sem cadastro: só voos dos próximos 60 dias, sem busca ao vivo e sem alerta, limite de 1.000 requisições por IP por dia. Data fora dos 60 dias dá erro (armadilha 24) |
+| Filtro de preço | Por padrão o seats.aero esconde emissão de preço dinâmico muito alto, e a resposta vem `filtered` (armadilha 41). Sem login não dá pra desligar |
+| Rotas monitoradas | `list_routes` com dois destes três: `origin`, `destination`, `mileage_program`. Com origem e destino, devolve os programas que o seats.aero acompanha na rota, e funciona sem login. Em 2026-11-09: CGH→SDU, 11 programas; VCP→MCO, 3 (`aeroplan`, `azul`, `united`); GRU→MAD, 15. Emirates, Iberia e British não acompanhavam rota doméstica. Nas 5 rotas testadas a lista veio igual nos dois sentidos |
 | Com login | Só com assinatura Pro do seats.aero: calendário inteiro, busca ao vivo, alertas e mais ferramentas. Login: `claude mcp login seats-aero` (a pessoa faz no navegador dela) |
 | Busca | `get_flights` com `origins` e `destinations` em lista, `cabin` com um valor só (uma chamada por cabine), `start_date` e `end_date` (até 60 dias por chamada), `max_results` (teto 50), `programs`, `operating_carriers` (companhia que voa, ex.: `G3`, `AD`), `max_stops` (padrão 0 = só direto, armadilha 15), `min_seats` (nem todo programa aceita), `max_fees` em centavos de dólar (armadilha 26). A resposta traz `status` (`results`, `filtered` ou `no_availability`), `truncated_by` (quantos resultados ficaram fora do corte) e `search_url` (a mesma busca no site) |
 | Frescor | `minutes_old` (7 dias ≈ 10 mil minutos) |

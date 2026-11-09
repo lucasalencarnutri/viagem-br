@@ -104,7 +104,7 @@ class Instalador:
             self.dizer("\nPróximos passos:\n"
                        "  - Tem assinatura Pro do seats.aero? Faça o login, que abre no seu navegador:\n"
                        "      claude mcp login seats-aero\n"
-                       "    Sem login a skill funciona, só com os próximos 60 dias e com a Azul só em parte.\n"
+                       "    Sem login a skill funciona, só com os próximos 60 dias.\n"
                        "  - Pra usar: digite claude no Terminal e peça, por exemplo,\n"
                        "    \"pesquisa voo de São Paulo pra Lisboa em fevereiro, econômica, 2 adultos\".")
         return codigo

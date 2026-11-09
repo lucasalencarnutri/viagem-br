@@ -2,6 +2,12 @@
 
 A versão mais nova fica no topo. A versão disponível pra baixar aparece no começo do guia de instalação.
 
+## 1.5.0 (09/11/2026)
+
+- Ida e volta passa a ser comparada com dois só-ida, e a conta do milheiro é feita em cada sentido. O veredito pode sair misto: um sentido em milhas, o outro em dinheiro.
+- Antes de buscar milhas, a skill consulta quais programas o seats.aero acompanha na rota. Programa que ele não acompanha sai marcado, em vez de parecer sem assento.
+- Correção: o que some no seats.aero não é a Azul de quem não tem login. É emissão com preço muito alto, que ele esconde por padrão. A célula passa a sair "preço alto, escondido pelo seats.aero".
+
 ## 1.4.0 (09/11/2026)
 
 - Cidade com mais de um aeroporto: São Paulo, Rio e Belo Horizonte entram inteiras numa busca só.
