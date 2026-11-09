@@ -22,7 +22,7 @@ Skill é um pacote de instruções que ensina o Claude a fazer uma tarefa sempre
 - **O seats.aero não diz se o preço é promocional ou tarifa pública.** Com a conta Pro, a skill compara o mesmo voo em outros programas e marca `[provável tarifa pública]`. Sem login essa conferência não existe, e a skill avisa.
 - **Bônus de transferência é com você.** A skill não acompanha promoção. Veja no app do banco o bônus ativo, a proporção e a data limite.
 - **Ela não emite nem compra nada.** Só pesquisa e faz a conta.
-- **Testada no Mac em 08/11/2026.** No Windows os comandos mudam e não foram testados: peça pro Claude Code adaptar cada passo.
+- **Testada no Mac em 08/11/2026.** No Windows os comandos mudam e nada foi testado, nem o instalador: peça pro Claude Code adaptar cada passo.
 - **Uso pessoal.** O seats.aero não permite uso comercial da API sem autorização por escrito. Se for atender cliente, fale com eles antes.
 
 ## O que você precisa
@@ -40,11 +40,7 @@ Cada um desses serviços é ligado ao Claude por um servidor MCP. MCP é como um
 
 Tudo acontece no Terminal, o aplicativo de comandos do Mac. Pra abrir: Command + Espaço, digite Terminal e aperte Enter. Copie um comando por vez, cole no Terminal e aperte Enter.
 
-Prefere não digitar comando? Faça os passos 1 e 3. Depois abra o Claude Code, cole este pedido e acompanhe:
-
-> Leia o arquivo ~/.claude/skills/viagem-br/README.md e faça a instalação dos outros passos pra mim, um por vez, me explicando cada um antes de rodar.
-
-O login do seats.aero é sempre você que faz, no seu navegador.
+São três passos, mais o login do seats.aero pra quem tem conta Pro. Esse login é sempre você que faz, no seu navegador.
 
 ### Passo 1: Claude Code
 
@@ -54,9 +50,57 @@ curl -fsSL https://claude.ai/install.sh | bash
 
 Depois rode `claude` e siga o login no navegador. Pra sair do Claude Code, digite `/exit`.
 
-### Passo 2: Node, Git e Python
+### Passo 2: colocar a skill na pasta certa
 
-Rode um por vez:
+Baixe o arquivo `viagem-br.skill`. Ele é um zip. Com ele na pasta Downloads, rode:
+
+```bash
+mkdir -p ~/.claude/skills && unzip -o ~/Downloads/viagem-br.skill -d ~/.claude/skills
+```
+
+### Passo 3: rodar o instalador
+
+```bash
+python3 ~/.claude/skills/viagem-br/scripts/instalar.py
+```
+
+Leva de 1 a 3 minutos. Ele confere o que a skill precisa (Node, Git e Claude Code), baixa e compila o servidor do Google Flights em `~/mcp/google-flights-mcp`, liga o Google Flights e o seats.aero no Claude Code e, no fim, chama cada um pra ver se responde. Deu certo se terminar com `Tudo certo.`
+
+Se parar no meio, ele diz o que falta. O mais comum é o Node: baixe a versão LTS em nodejs.org, instale, abra um Terminal novo e rode o instalador de novo. Se o Mac abrir uma janela oferecendo as "ferramentas de linha de comando", aceite e espere terminar: é isso que instala o Git e o Python.
+
+O instalador não pede senha de administrador, não apaga pasta, não faz login em nada e não mexe em servidor que você já tinha ligado com o mesmo nome. Pode rodar de novo quantas vezes quiser.
+
+Kiwi e Skiplagged conferem o preço em outra fonte, e o Trivago busca hotel em reais. São opcionais. Pra ligar os três também:
+
+```bash
+python3 ~/.claude/skills/viagem-br/scripts/instalar.py --com-opcionais
+```
+
+### Passo 4: conecte a sua conta do seats.aero
+
+A skill não vem com conta nem chave de ninguém: cada pessoa usa a própria. Aqui não existe caminho por chave de API, o acesso é só o login da sua conta.
+
+Sem login, o seats.aero só enxerga os próximos 60 dias e esconde a Azul. Pra ver mais longe e ver a Azul, a sua conta precisa do plano Pro. Confira preço e condições no site do seats.aero no dia em que for assinar, porque isso muda. Não quer assinar? Pule este passo: a skill funciona dentro desses limites e avisa o que ficou de fora.
+
+Com o plano Pro, crie a sua conta em seats.aero, com o seu e-mail, e faça o login. Ele abre no seu navegador. Nunca passe senha ou chave sua pro Claude:
+
+```bash
+claude mcp login seats-aero
+```
+
+### Conferir quando quiser
+
+```bash
+python3 ~/.claude/skills/viagem-br/scripts/instalar.py --conferir
+```
+
+Chama cada servidor uma vez e diz o que respondeu. Não instala nada.
+
+### Prefere fazer à mão?
+
+O instalador roda os comandos abaixo. Se preferir, faça você, no lugar do passo 3.
+
+Confira o Node (22.12 ou mais novo), o Git e o Python, um por vez:
 
 ```bash
 node --version
@@ -70,49 +114,23 @@ git --version
 python3 --version
 ```
 
-O Node precisa ser 22.12 ou mais novo. Se der erro ou número menor, baixe a versão LTS em nodejs.org e instale. Se o Mac abrir uma janela oferecendo as "ferramentas de linha de comando", aceite e espere terminar: é isso que instala o Git e o Python.
-
-### Passo 3: colocar a skill na pasta certa
-
-Baixe o arquivo `viagem-br.skill`. Ele é um zip. Com ele na pasta Downloads, rode:
-
-```bash
-mkdir -p ~/.claude/skills && unzip -o ~/Downloads/viagem-br.skill -d ~/.claude/skills
-```
-
-### Passo 4: Google Flights
-
-O pacote do npm ainda entrega a versão 1.0.3, que parou de funcionar quando o Google mudou o site. A versão que funciona está no GitHub, e o comando abaixo fixa exatamente ela (conferido em 08/11/2026):
+Baixe e compile o servidor do Google Flights. O pacote do npm ainda entrega a versão 1.0.3, que parou de funcionar quando o Google mudou o site. A versão que funciona está no GitHub, e o comando abaixo fixa exatamente ela (conferido em 08/11/2026):
 
 ```bash
 mkdir -p ~/mcp && cd ~/mcp && git clone https://github.com/andreacappelletti97/google-flights-mcp.git && cd google-flights-mcp && git checkout 9e261981b5d2893594fb0f22a21a255d1e52a884 && npm ci && npm run build
 ```
 
-Deu certo se o final mostrar `Build success`. Agora ligue no Claude Code:
+Deu certo se o final mostrar `Build success`. Agora ligue os dois servidores no Claude Code:
 
 ```bash
 claude mcp add --scope user google-flights -- node ~/mcp/google-flights-mcp/dist/index.js
 ```
 
-### Passo 5: conecte a sua conta do seats.aero
-
-A skill não vem com conta nem chave de ninguém: cada pessoa usa a própria. Aqui não existe caminho por chave de API, o acesso é só o login da sua conta.
-
-Crie a sua conta em seats.aero, com o seu e-mail. Depois ligue o servidor oficial:
-
 ```bash
 claude mcp add --transport http --scope user seats-aero https://seats.aero/mcp
 ```
 
-E faça o login com a sua conta. Ele abre no seu navegador. Nunca passe senha ou chave sua pro Claude:
-
-```bash
-claude mcp login seats-aero
-```
-
-Sem login, o seats.aero só enxerga os próximos 60 dias e esconde a Azul. Pra ver mais longe e ver a Azul, a sua conta precisa do plano Pro. Confira preço e condições no site do seats.aero no dia em que for assinar, porque isso muda. Não quer assinar? Pule o login: a skill funciona dentro desses limites e avisa o que ficou de fora.
-
-### Passo 6: Kiwi, Skiplagged e Trivago (opcional)
+Os opcionais, se quiser:
 
 ```bash
 claude mcp add --transport http --scope user kiwi https://mcp.kiwi.com
@@ -122,25 +140,15 @@ claude mcp add --transport http --scope user kiwi https://mcp.kiwi.com
 claude mcp add --transport http --scope user skiplagged https://mcp.skiplagged.com/mcp
 ```
 
-O Trivago busca hotel em reais, quando você pedir:
-
 ```bash
 claude mcp add --transport http --scope user trivago https://mcp.trivago.com/mcp
 ```
 
-### Passo 7: conferir
+E confira. Cada servidor precisa aparecer com `✔ Connected`:
 
 ```bash
 claude mcp list
 ```
-
-Cada servidor precisa aparecer com `✔ Connected`. Se quiser testar a skill também:
-
-```bash
-cd ~/.claude/skills/viagem-br && python3 scripts/test.py
-```
-
-Deu certo se terminar com `OK`.
 
 ## Ajuste a sua régua
 
@@ -167,9 +175,10 @@ Se a skill não entrar sozinha, comece o pedido com `/viagem-br`.
 | O que apareceu | O que fazer |
 |---|---|
 | `command not found: claude` | Feche o Terminal, abra de novo e tente outra vez |
-| `Unsupported engine` ou `EBADENGINE` no passo 4 | Seu Node é antigo. Instale a versão LTS em nodejs.org e rode o comando de novo, apagando antes a pasta `~/mcp/google-flights-mcp` |
-| `destination path already exists` no passo 4 | A pasta já existe de uma tentativa anterior. Apague `~/mcp/google-flights-mcp` e rode de novo |
-| Algum servidor sem `✔ Connected` | Confira a internet e rode `claude mcp list` de novo. No Google Flights, confira se o passo 4 terminou com `Build success` |
+| `PAROU:` no instalador | Ele diz o que falta logo abaixo. Resolva e rode o instalador de novo |
+| `Unsupported engine` ou `EBADENGINE`, instalando à mão | Seu Node é antigo. Instale a versão LTS em nodejs.org e rode o instalador |
+| `destination path already exists`, instalando à mão | A pasta já existe de uma tentativa anterior. Rode o instalador, que reaproveita a pasta |
+| Algum servidor com `✘` ou sem `✔ Connected` | Confira a internet e rode o instalador com `--conferir`, que diz o que falta |
 | "No flight data found" ou "changed the response format" | O Google bloqueou ou mudou a página. Espere alguns minutos e peça de novo |
 | `anonymous searches must use dates from` | Sem login Pro, o seats.aero só enxerga 60 dias à frente |
 | A Azul não aparece nas milhas | Sem login Pro, o seats.aero esconde a Azul |
@@ -178,7 +187,7 @@ Se a skill não entrar sozinha, comece o pedido com `/viagem-br`.
 
 A sua versão está no topo do arquivo `~/.claude/skills/viagem-br/MUDANCAS.md`, e a mais nova, no começo do guia de instalação. Se preferir, pergunte pro Claude "qual versão da Viagem BR eu tenho?".
 
-Pra atualizar, baixe o arquivo novo e repita o passo 3. A sua régua fica em `~/.viagem-br/` e não é tocada.
+Pra atualizar, baixe o arquivo novo, repita o passo 2 e rode o instalador de novo: ele só refaz o que mudou. A sua régua fica em `~/.viagem-br/` e não é tocada.
 
 Sua pasta não tem `MUDANCAS.md`? Então a versão é anterior à 1.1.0, e a régua ficava dentro da pasta da skill. Se você preencheu, anote os valores antes de atualizar e peça pro Claude gravar de novo depois.
 

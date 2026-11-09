@@ -18,6 +18,7 @@ from pathlib import Path
 from unittest import mock
 
 import audit
+import instalar
 import milheiro as modulo_milheiro
 import ponte_mcp
 from milheiro import (ECOS, FALTA_PRECO, FALTA_REGUA, Regua, comparar, estimar, gravar, interpretar_regua,
@@ -586,6 +587,21 @@ class TestDocumentacao(unittest.TestCase):
     def test_commit_do_google_flights_igual_em_todo_lugar(self):
         self.assertIn("9e26198", self.ler("SKILL.md"))
         self.assertIn("git checkout 9e26198", self.ler("README.md"))
+        self.assertTrue(instalar.COMMIT_GF.startswith("9e26198"))
+        self.assertEqual(len(instalar.COMMIT_GF), 40)  # o instalador confere o commit inteiro
+        self.assertIn(f"git checkout {instalar.COMMIT_GF}", self.ler("README.md"))
+
+    def test_textos_mandam_rodar_o_instalador(self):
+        self.assertIn("python3 ~/.claude/skills/viagem-br/scripts/instalar.py", self.ler("README.md"))
+        self.assertIn("scripts/instalar.py --conferir", self.ler("README.md"))
+        self.assertIn("`python3 scripts/instalar.py --conferir`", self.ler("SKILL.md"))
+
+    def test_enderecos_dos_servidores_iguais_no_readme_e_no_instalador(self):
+        readme = self.ler("README.md")
+        for url in (instalar.URL_SEATS, *instalar.OPCIONAIS.values()):
+            with self.subTest(url=url):
+                self.assertIn(url, readme)
+        self.assertEqual(instalar.URL_SEATS, ponte_mcp.URL_SEATS_AERO)
 
     def test_nome_da_skill_igual_ao_da_pasta(self):
         self.assertIn("name: viagem-br\n", self.ler("SKILL.md"))
@@ -901,6 +917,257 @@ class TestPonteHttp(unittest.TestCase):
         self.assertEqual(codigo, 0)
         self.assertIn("60 dias", erro.getvalue())
         self.assertNotIn("60 dias", saida.getvalue())
+
+
+class _ComputadorFalso:
+    """Finge o computador de quem instala: quais ferramentas existem e o que cada comando responde.
+    Nada aqui toca rede, Node, Git ou a configuração real do Claude Code."""
+
+    def __init__(self, pasta, ferramentas=("node", "git", "npm", "claude"), node="v24.15.0",
+                 ligados=(), remoto=None, commit=None, build_ok=True, status="✓ Connected"):
+        self.pasta = pasta
+        self.ferramentas = set(ferramentas)
+        self.node = node
+        self.ligados = list(ligados)
+        self.remoto = remoto or instalar.REPO_GF
+        self.commit = commit  # commit em que a pasta já está, se ela existir
+        self.build_ok = build_ok
+        self.status = status
+        self.chamadas = []
+
+    def achar(self, nome):
+        return f"/falso/{nome}" if nome in self.ferramentas else None
+
+    def feitas(self, *trecho):
+        """Chamadas que contêm esse trecho, em ordem (ex.: feitas("mcp", "add"))."""
+        n = len(trecho)
+        return [c for c in self.chamadas if any(tuple(c[i:i + n]) == trecho for i in range(len(c)))]
+
+    def rodar(self, cmd, cwd=None):
+        cmd = [str(parte) for parte in cmd]
+        self.chamadas.append(cmd)
+        nome, resto = Path(cmd[0]).name, cmd[1:]
+        if nome == "node" and resto == ["--version"]:
+            return 0, self.node
+        if nome == "git" and resto[:1] == ["clone"]:
+            self.pasta.mkdir(parents=True)
+            self.commit = "f" * 40  # o clone cai na ponta da branch, não no commit fixado
+            return 0, ""
+        if nome == "git" and resto[2:] == ["remote", "get-url", "origin"]:
+            return 0, self.remoto + "\n"
+        if nome == "git" and resto[2:] == ["rev-parse", "HEAD"]:
+            return 0, self.commit + "\n"
+        if nome == "git" and "checkout" in resto:
+            self.commit = resto[-1]
+            return 0, ""
+        if nome == "git" and "fetch" in resto:
+            return 0, ""
+        if nome == "npm" and resto == ["ci"]:
+            return 0, ""
+        if nome == "npm" and resto == ["run", "build"]:
+            if not self.build_ok:
+                return 1, "erro de build inventado"
+            (self.pasta / "dist").mkdir(exist_ok=True)
+            (self.pasta / "dist" / "index.js").write_text("// falso", encoding="utf-8")
+            return 0, "Build success"
+        if nome == "claude" and resto[:2] == ["mcp", "get"]:
+            if resto[2] in self.ligados:
+                return 0, f"{resto[2]}:\n  Scope: User config\n  Status: {self.status}\n"
+            return 1, f'No MCP server named "{resto[2]}".'
+        if nome == "claude" and resto[:2] == ["mcp", "add"]:
+            self.ligados.append("google-flights" if "google-flights" in resto else
+                                next(n for n in ("seats-aero", *instalar.OPCIONAIS) if n in resto))
+            return 0, "Added"
+        raise AssertionError(f"comando inesperado no teste: {cmd}")
+
+
+class TestInstalador(unittest.TestCase):
+    def setUp(self):
+        td = tempfile.TemporaryDirectory()
+        self.addCleanup(td.cleanup)
+        self.pasta = Path(td.name) / "mcp" / "google-flights-mcp"
+        self.saida = []
+        self.respostas_dos_servidores = []
+
+    def pc(self, **como):
+        return _ComputadorFalso(self.pasta, **como)
+
+    def chamar_falso(self, cmd, env, metodo, params=None, timeout=None):
+        self.respostas_dos_servidores.append(cmd)
+        return {"content": [{"type": "text", "text": "LIS - Lisbon Humberto Delgado Airport"}]}
+
+    def instalador(self, pc, chamar=None):
+        return instalar.Instalador(rodar=pc.rodar, achar=pc.achar, chamar=chamar or self.chamar_falso,
+                                   pasta_gf=self.pasta, dizer=self.saida.append)
+
+    def texto(self):
+        return "\n".join(self.saida)
+
+    def test_do_zero_baixa_no_commit_fixado_compila_e_liga_os_dois_servidores(self):
+        pc = self.pc()
+        self.assertEqual(self.instalador(pc).instalar(), 0)
+        self.assertEqual(len(pc.feitas("clone")), 1)
+        self.assertIn(instalar.REPO_GF, pc.feitas("clone")[0])
+        self.assertEqual(pc.commit, instalar.COMMIT_GF)
+        self.assertEqual(len(pc.feitas("ci")), 1)
+        self.assertEqual(len(pc.feitas("run", "build")), 1)
+        google, seats = pc.feitas("mcp", "add")
+        # `node` sem caminho, como no passo manual do README: sobrevive a trocar a versão do Node
+        self.assertEqual(google[-3:], ["--", "node", str(self.pasta / "dist" / "index.js")])
+        self.assertIn("google-flights", google)
+        self.assertEqual(seats[-2:], ["seats-aero", instalar.URL_SEATS])
+        self.assertIn("http", seats)
+        for cmd in (google, seats):
+            self.assertEqual(cmd[cmd.index("--scope") + 1], "user")
+        self.assertIn("Tudo certo", self.texto())
+
+    def test_padrao_nao_liga_os_opcionais(self):
+        pc = self.pc()
+        self.instalador(pc).instalar()
+        self.assertEqual(sorted(pc.ligados), ["google-flights", "seats-aero"])
+
+    def test_com_opcionais_liga_os_tres(self):
+        pc = self.pc()
+        self.assertEqual(self.instalador(pc).instalar(opcionais=True), 0)
+        self.assertEqual(sorted(pc.ligados), ["google-flights", "kiwi", "seats-aero", "skiplagged", "trivago"])
+        kiwi = next(c for c in pc.feitas("mcp", "add") if "kiwi" in c)
+        self.assertEqual(kiwi[-1], instalar.OPCIONAIS["kiwi"])
+
+    def test_rodar_de_novo_nao_baixa_nao_compila_e_nao_liga_outra_vez(self):
+        pc = self.pc()
+        self.instalador(pc).instalar()
+        pc.chamadas.clear()
+        self.assertEqual(self.instalador(pc).instalar(), 0)
+        for trecho in (("clone",), ("ci",), ("run", "build"), ("mcp", "add"), ("checkout",)):
+            with self.subTest(trecho=trecho):
+                self.assertEqual(pc.feitas(*trecho), [])
+
+    def test_node_antigo_para_antes_de_baixar_qualquer_coisa(self):
+        pc = self.pc(node="v20.11.1")
+        self.assertEqual(self.instalador(pc).instalar(), 1)
+        self.assertEqual(pc.feitas("clone"), [])
+        self.assertEqual(pc.feitas("mcp", "add"), [])
+        self.assertIn("nodejs.org", self.texto())
+        self.assertIn("22.12", self.texto())
+
+    def test_node_22_11_ainda_e_antigo_e_22_12_serve(self):
+        self.assertEqual(self.instalador(self.pc(node="v22.11.0")).instalar(), 1)
+        self.assertEqual(self.instalador(self.pc(node="v22.12.0")).instalar(), 0)
+
+    def test_ferramenta_faltando_lista_todas_e_para(self):
+        pc = self.pc(ferramentas=("node", "npm"))
+        self.assertEqual(self.instalador(pc).instalar(), 1)
+        self.assertEqual(pc.feitas("clone"), [])
+        self.assertIn("Git", self.texto())
+        self.assertIn("Claude Code", self.texto())
+
+    def test_pasta_de_outro_repositorio_para_sem_mexer(self):
+        self.pasta.mkdir(parents=True)
+        (self.pasta / "meu-arquivo.txt").write_text("não apague", encoding="utf-8")
+        pc = self.pc(remoto="https://github.com/outra-pessoa/outra-coisa.git", commit="a" * 40)
+        self.assertEqual(self.instalador(pc).instalar(), 1)
+        self.assertTrue((self.pasta / "meu-arquivo.txt").exists())
+        for trecho in (("checkout",), ("ci",), ("mcp", "add")):
+            self.assertEqual(pc.feitas(*trecho), [])
+        self.assertIn(str(self.pasta), self.texto())
+
+    def test_pasta_em_outro_commit_volta_pro_fixado_e_recompila(self):
+        self.pasta.mkdir(parents=True)
+        (self.pasta / "dist").mkdir()
+        (self.pasta / "dist" / "index.js").write_text("// versão antiga", encoding="utf-8")
+        pc = self.pc(commit="b" * 40)
+        self.assertEqual(self.instalador(pc).instalar(), 0)
+        self.assertEqual(pc.feitas("clone"), [])
+        self.assertEqual(pc.commit, instalar.COMMIT_GF)
+        self.assertEqual(len(pc.feitas("run", "build")), 1)
+
+    def test_endereco_do_repositorio_sem_ponto_git_tambem_vale(self):
+        self.pasta.mkdir(parents=True)
+        pc = self.pc(remoto=instalar.REPO_GF[:-len(".git")], commit=instalar.COMMIT_GF)
+        self.assertEqual(self.instalador(pc).instalar(), 0)
+
+    def test_build_que_falha_para_e_nao_liga_o_servidor(self):
+        pc = self.pc(build_ok=False)
+        self.assertEqual(self.instalador(pc).instalar(), 1)
+        self.assertNotIn("google-flights", pc.ligados)
+        self.assertIn("erro de build inventado", self.texto())
+
+    def test_servidor_que_a_pessoa_ja_tinha_nao_e_mexido(self):
+        pc = self.pc(ligados=("google-flights", "seats-aero"))
+        self.assertEqual(self.instalador(pc).instalar(), 0)
+        self.assertEqual(pc.feitas("mcp", "add"), [])
+        self.assertIn("não mexi", self.texto())
+
+    def test_nunca_faz_login_nem_apaga_nem_pede_administrador(self):
+        cenarios = (dict(), dict(node="v20.0.0"), dict(build_ok=False), dict(ligados=("google-flights",)))
+        for como in cenarios:
+            pc = self.pc(**como)
+            inst = self.instalador(pc)
+            inst.instalar(opcionais=True)
+            inst.conferir()
+            for cmd in pc.chamadas:
+                with self.subTest(como=como, cmd=cmd):
+                    self.assertFalse({"login", "logout", "remove", "sudo", "rm", "rmdir"} & set(cmd))
+            if self.pasta.exists():
+                import shutil
+                shutil.rmtree(self.pasta)
+
+    def test_conferir_chama_os_dois_servidores_e_nao_instala_nada(self):
+        pc = self.pc()
+        self.instalador(pc).instalar()
+        pc.chamadas.clear()
+        self.respostas_dos_servidores.clear()
+        self.assertEqual(self.instalador(pc).conferir(), 0)
+        self.assertEqual(self.respostas_dos_servidores,
+                         [["/falso/node", str(self.pasta / "dist" / "index.js")], instalar.URL_SEATS])
+        for trecho in (("clone",), ("ci",), ("run", "build"), ("mcp", "add")):
+            self.assertEqual(pc.feitas(*trecho), [])
+        self.assertIn("Tudo certo", self.texto())
+
+    def test_conferir_sem_nada_instalado_diz_o_que_falta_e_sai_com_erro(self):
+        pc = self.pc()
+        self.assertEqual(self.instalador(pc).conferir(), 1)
+        self.assertEqual(pc.feitas("clone"), [])
+        self.assertIn("instalar.py", self.texto())
+
+    def test_conferir_acusa_servidor_que_nao_responde(self):
+        def chamar_quebrado(cmd, env, metodo, params=None, timeout=None):
+            if isinstance(cmd, list):
+                raise SystemExit("ERRO: o servidor encerrou em 'initialize'")
+            return {"content": [{"type": "text", "text": "{}"}]}
+        pc = self.pc()
+        self.instalador(pc).instalar()
+        self.saida.clear()
+        self.assertEqual(self.instalador(pc, chamar=chamar_quebrado).conferir(), 1)
+        self.assertIn("o servidor encerrou", self.texto())
+        self.assertNotIn("Tudo certo", self.texto())
+
+    def test_conferir_acusa_servidor_ligado_que_nao_conecta_no_claude_code(self):
+        pc = self.pc(status="✘ Failed to connect")
+        self.instalador(pc).instalar()
+        self.saida.clear()
+        self.assertEqual(self.instalador(pc).conferir(), 1)
+        self.assertIn("Failed to connect", self.texto())
+
+    def test_linha_de_comando(self):
+        feito = []
+
+        class Espiao:
+            def __init__(self, **_):
+                pass
+
+            def instalar(self, opcionais=False):
+                feito.append(("instalar", opcionais))
+                return 0
+
+            def conferir(self):
+                feito.append(("conferir",))
+                return 0
+        with mock.patch.object(instalar, "Instalador", Espiao):
+            self.assertEqual(instalar.main([]), 0)
+            self.assertEqual(instalar.main(["--com-opcionais"]), 0)
+            self.assertEqual(instalar.main(["--conferir"]), 0)
+        self.assertEqual(feito, [("instalar", False), ("instalar", True), ("conferir",)])
 
 
 if __name__ == "__main__":

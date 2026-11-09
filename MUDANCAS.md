@@ -2,6 +2,13 @@
 
 A versão mais nova fica no topo. A versão disponível pra baixar aparece no começo do guia de instalação.
 
+## 1.2.0 (09/11/2026)
+
+- Instalador único: `python3 ~/.claude/skills/viagem-br/scripts/instalar.py` confere o que falta, baixa e compila o servidor do Google Flights e liga os servidores no Claude Code.
+- `--conferir` chama cada servidor uma vez e diz o que respondeu, sem instalar nada.
+- Kiwi, Skiplagged e Trivago passam a ser ligados só com `--com-opcionais`.
+- O passo a passo manual continua no README, pra quem prefere.
+
 ## 1.1.0 (09/11/2026)
 
 - Sua régua passa a morar em `~/.viagem-br/regua-milheiro.md`, fora da pasta da skill. Atualizar a skill não apaga mais os seus valores.

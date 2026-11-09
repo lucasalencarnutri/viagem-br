@@ -28,7 +28,7 @@ Servidores `google-flights` e `seats-aero`, por um destes caminhos, nesta ordem:
 1. **MCP nativo da ferramenta** (Claude Code e outras que aceitam MCP). `claude mcp list` confere. O prefixo do nome das ferramentas muda de uma ferramenta pra outra (`mcp__google-flights__search_flights`, `google-flights_search_flights`): vale o nome base (`search_flights`, `get_flights`). Kiwi e Skiplagged são opcionais (Passo 4).
 2. **Ponte de terminal**, em qualquer ferramenta que rode comandos: `python3 scripts/ponte_mcp.py <servidor> <ferramenta> '<argumentos em JSON>'` chama uma ferramenta e imprime o resultado; `--lista` no lugar da ferramenta mostra as ferramentas e os parâmetros. Pela ponte, o `seats-aero` é sempre anônimo (armadilha 24). Ferramenta que bloqueia rede no terminal precisa liberar a rede pra ponte ou usar o caminho 1.
 
-Nenhum dos dois respondeu: parar, avisar e apontar o `README.md`, sem pesquisar.
+Nenhum dos dois respondeu: parar, sem pesquisar, e rodar `python3 scripts/instalar.py --conferir`, que chama cada servidor e diz o que falta. Instalar ou reinstalar (`python3 scripts/instalar.py`) só com o ok da pessoa; o passo a passo está no `README.md`.
 
 **seats.aero.** É o MCP oficial (`https://seats.aero/mcp`), com a conta de cada pessoa. Sem login ele só enxerga os próximos 60 dias e não mostra a Azul. Campos e limites: `references/seats-aero.md`. A skill não tem caminho por chave de API: o acesso é o login da conta da própria pessoa. Chave de API em arquivo ou na resposta é violação de segurança: o audit rejeita o padrão `pro_...` em qualquer linha.
 
