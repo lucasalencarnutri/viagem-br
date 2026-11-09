@@ -668,6 +668,40 @@ class TestDocumentacao(unittest.TestCase):
             with self.subTest(arquivo=nome):
                 self.assertIn("MUDANCAS.md", self.ler(nome))
 
+    def test_nenhum_texto_diz_que_a_azul_some_sem_login(self):
+        # 2026-11-09: sem login a Azul apareceu em rota doméstica e pra Lisboa. Ela aparece em parte.
+        frases = ("não mostra a Azul", "esconde a Azul", "sem a Azul", "esconde os voos da Azul")
+        arquivos = [*self.ARQUIVOS, "scripts/ponte_mcp.py", "scripts/instalar.py"]
+        for nome in arquivos:
+            texto = self.ler(nome)
+            for frase in frases:
+                with self.subTest(arquivo=nome, frase=frase):
+                    self.assertNotIn(frase, texto)
+        for nome in ("SKILL.md", "README.md", "references/seats-aero.md", "scripts/ponte_mcp.py"):
+            with self.subTest(arquivo=nome):
+                self.assertIn("Azul só em parte", self.ler(nome))
+
+    def test_metodo_tem_a_rota_domestica(self):
+        skill = self.ler("SKILL.md")
+        self.assertIn("## Rota doméstica", skill)
+        secao = skill.split("## Rota doméstica")[1].split("\n## ")[0]
+        self.assertIn("não pesquisada: rota doméstica", secao)
+        for programa in ("smiles", "azul", "american", "aeroplan", "united", "livelo", "delta", "virginatlantic"):
+            with self.subTest(programa=programa):
+                self.assertIn(f'"{programa}"', secao)
+        # achados da pesquisa de ponta a ponta de 2026-11-09 (São Paulo⇄Recife, sem login)
+        for trecho in ("Emirates", "LATAM", "app do banco", "armadilha 36", "armadilha 37", "por sentido",
+                       "`max_stops: 0`", '`operating_carriers: ["LA"]`', "sem repetir programa",
+                       "sem dado: programa fora do seats.aero"):
+            with self.subTest(trecho=trecho):
+                self.assertIn(trecho, secao)
+
+    def test_textos_nao_dizem_que_voo_da_latam_fica_de_fora(self):
+        self.assertNotIn("LATAM Pass fica de fora", self.ler("README.md"))
+        for nome in ("README.md", "references/fatos-programas.md", "references/seats-aero.md"):
+            with self.subTest(arquivo=nome):
+                self.assertIn("Virgin Atlantic", self.ler(nome))
+
     def test_sem_travessao_nos_textos(self):
         for nome in [*self.ARQUIVOS, "exemplo/pesquisa-exemplo.md"]:
             with self.subTest(arquivo=nome):
@@ -707,6 +741,30 @@ class TestAudit(unittest.TestCase):
         viol = audit.auditar(
             self.bom.replace("R$ 14.980 · 4 opções/dia", "sem dado: ferramenta bloqueada"))
         self.assertEqual(viol, [])
+
+    def test_rota_domestica_sem_executiva_passa(self):
+        # em rota doméstica a executiva não é pesquisada: as duas células saem marcadas, sem chamada
+        domestica = (self.bom
+                     .replace("R$ 14.980 · 4 opções/dia", "não pesquisada: rota doméstica")
+                     .replace("390k milhas + R$ 350 · 2 programas (Azul, Smiles)", "não pesquisada: rota doméstica"))
+        self.assertEqual(audit.auditar(domestica), [])
+
+    def test_celula_de_executiva_em_branco_continua_reprovada(self):
+        viol = audit.auditar(self.bom.replace("R$ 14.980 · 4 opções/dia", "não pesquisada"))
+        self.assertTrue(any("dinheiro × executiva" in v for v in viol))
+
+    def test_programa_fora_do_seats_aero_tem_marcador_proprio(self):
+        # LATAM Pass não está no seats.aero: "sem estoque" afirmaria o que ninguém conferiu
+        viol = audit.auditar(self.bom.replace("390k milhas + R$ 350 · 2 programas (Azul, Smiles)",
+                                              "sem dado: programa fora do seats.aero"))
+        self.assertEqual(viol, [])
+
+    def test_exemplo_nao_chama_programa_sem_cobertura_de_sem_estoque(self):
+        linhas_latam = [l for l in self.bom.splitlines() if "LATAM Pass" in l and l.startswith("|")]
+        self.assertTrue(linhas_latam)
+        for linha in linhas_latam:
+            self.assertIn("sem dado: programa fora do seats.aero", linha)
+            self.assertNotIn("sem estoque no cache", linha)
 
     def test_celula_sem_login_ok(self):
         viol = audit.auditar(

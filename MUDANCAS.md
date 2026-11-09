@@ -2,6 +2,13 @@
 
 A versão mais nova fica no topo. A versão disponível pra baixar aparece no começo do guia de instalação.
 
+## 1.3.0 (09/11/2026)
+
+- Voo dentro do Brasil: a executiva só é pesquisada se você pedir, e as duas células saem "não pesquisada: rota doméstica".
+- Em rota doméstica, as milhas olham Smiles e Azul e também programas de fora que emitem Gol, Azul e LATAM: American, Aeroplan, United, Livelo, Delta e Virgin Atlantic.
+- Correção: sem login, o seats.aero mostra a Azul em parte. As versões anteriores diziam que ele escondia a Azul inteira.
+- Correção: o que está fora do seats.aero é o programa LATAM Pass. Voo da LATAM pode aparecer por Delta e Virgin Atlantic. A célula da LATAM Pass passa a sair "sem dado: programa fora do seats.aero", e não mais "sem estoque".
+
 ## 1.2.0 (09/11/2026)
 
 - Instalador único: `python3 ~/.claude/skills/viagem-br/scripts/instalar.py` confere o que falta, baixa e compila o servidor do Google Flights e liga os servidores no Claude Code.

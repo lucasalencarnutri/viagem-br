@@ -19,7 +19,8 @@ CELULAS = ["dinheiro × econômica", "dinheiro × executiva",
 _PISO_DINHEIRO_RE = re.compile(r"R\$\s*[\d.,]+\s*·\s*\d+")
 _PISO_MILHAS_RE = re.compile(r"[\d.,]+\s*k\s+milhas[^\n]*·\s*\d+")
 _MARCADOR_VAZIO = ("sem estoque no cache", "sem voo", "sem dado: ferramenta bloqueada",
-                   "sem dado: seats.aero sem login")
+                   "sem dado: seats.aero sem login", "não pesquisada: rota doméstica",
+                   "sem dado: programa fora do seats.aero")
 _FALTA_RE = re.compile(r"\[FALTA:[^\]]+\]")
 _CHAVE_RE = re.compile(r"pro_[A-Za-z0-9]{20,}")
 

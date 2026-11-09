@@ -13,7 +13,7 @@ máx. 1 conexão · [FALTA: PAX] (assumido 1 adulto).
 
 >> [FALTA: PAX]: a ENTRADA não trouxe; buscas rodadas com 1 adulto.
 >> Milhas: sem LATAM Pass no seats-aero. Célula do programa marcada
-   "sem estoque no cache" com a data da checagem.
+   "sem dado: programa fora do seats.aero".
 
 ## TABELA
 
@@ -25,7 +25,7 @@ Matriz completa, cada célula com PISO · DENSIDADE (sujeito a disponibilidade):
 | dinheiro × executiva | R$ 14.980 · 4 opções/dia |
 | milhas × econômica | 128k milhas + R$ 380 · 2 programas (Azul, Smiles) |
 | milhas × executiva | 390k milhas + R$ 350 · 2 programas (Azul, Smiles) |
-| milhas × executiva (LATAM Pass) | sem estoque no cache (checagem 2026-08-20) [FALTA: busca manual no programa] |
+| milhas × executiva (LATAM Pass) | sem dado: programa fora do seats.aero [FALTA: busca manual no programa] |
 
 Finalistas em dinheiro: companhia que voa | rota e conexões | duração total |
 horários-chave | preço | posição vs faixa típica:

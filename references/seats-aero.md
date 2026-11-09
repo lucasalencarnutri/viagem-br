@@ -1,14 +1,14 @@
 # seats.aero: como o servidor funciona
 
-O servidor é o MCP oficial, `https://seats.aero/mcp`, e cada pessoa usa a própria conta. Medido em 2026-11-01; login, recorte por banco e `max_fees` revistos em 2026-11-07; limites de conta conferidos em 2026-11-08; lista de programas, em 2026-11-09. Mudou o servidor: re-testar e atualizar com data.
+O servidor é o MCP oficial, `https://seats.aero/mcp`, e cada pessoa usa a própria conta. Medido em 2026-11-01; login, recorte por banco e `max_fees` revistos em 2026-11-07; limites de conta conferidos em 2026-11-08; lista de programas, Azul sem login e rota doméstica, em 2026-11-09. Mudou o servidor: re-testar e atualizar com data.
 
 | Item | Como funciona |
 |---|---|
-| Sem login | De graça e sem cadastro: só voos dos próximos 60 dias, sem a Azul, sem busca ao vivo e sem alerta, limite de 1.000 requisições por IP por dia. Data fora dos 60 dias dá erro (armadilha 24) |
+| Sem login | De graça e sem cadastro: só voos dos próximos 60 dias, a Azul só em parte (armadilha 24), sem busca ao vivo e sem alerta, limite de 1.000 requisições por IP por dia. Data fora dos 60 dias dá erro (armadilha 24) |
 | Com login | Só com assinatura Pro do seats.aero: calendário inteiro, busca ao vivo, alertas e mais ferramentas. Login: `claude mcp login seats-aero` (a pessoa faz no navegador dela) |
 | Busca | `get_flights` com `origins` e `destinations` em lista, `cabin` com um valor só (uma chamada por cabine), `start_date` e `end_date` (até 60 dias por chamada), `max_results` (teto 50), `programs`, `operating_carriers` (companhia que voa, ex.: `G3`, `AD`), `max_stops` (padrão 0 = só direto, armadilha 15), `min_seats` (nem todo programa aceita), `max_fees` em centavos de dólar (armadilha 26). A resposta traz `status` (`results`, `filtered` ou `no_availability`), `truncated_by` (quantos resultados ficaram fora do corte) e `search_url` (a mesma busca no site) |
 | Frescor | `minutes_old` (7 dias ≈ 10 mil minutos) |
-| Programas | 34 em `programs` (2026-11-09), com `smiles`, `azul`, `iberia`, `british`, `qatar`, `lifemiles`, `livelo`, `jal`, `asiamiles` e `jetblue`. LATAM Pass fora |
+| Programas | 34 em `programs` (2026-11-09), com `smiles`, `azul`, `iberia`, `british`, `qatar`, `lifemiles`, `livelo`, `jal`, `asiamiles` e `jetblue`. LATAM Pass fora; voo da LATAM aparece por `delta` e `virginatlantic` (Virgin Atlantic), com cobertura rala (2026-11-09) |
 | Detalhe do voo | `get_flight_details` (por `flight_ref`) |
 | Busca ao vivo | `live_search`, só com login, com cota da conta e um programa por chamada (tem `smiles`, não tem `azul`). Gasta a cota: usar só perto da emissão ou quando o cache estiver velho |
 | Preço de clube | Opções salvas na conta (`get_pricing_options`), só com login; não conferido se o Clube Smiles está lá |
@@ -30,4 +30,4 @@ Pela ponte de terminal (`scripts/ponte_mcp.py seats-aero ...`) a sessão é semp
 
 ## Avisos por resultado
 
-`unknown_seat_count` (armadilha 16), `unknown_taxes` (armadilha 17) e `mixed_cabin` quando `min_cabin_pct` fica abaixo de 100 (trecho em cabine inferior: avisar a pessoa).
+`unknown_seat_count` (armadilha 16), `unknown_taxes` (armadilha 17), `stale` (foto velha pelo critério do servidor; em 2026-11-09 veio com `minutes_old` a partir de 8 mil) e `mixed_cabin` quando `min_cabin_pct` fica abaixo de 100 (trecho em cabine inferior: avisar a pessoa).
