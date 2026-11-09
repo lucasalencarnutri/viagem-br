@@ -35,6 +35,12 @@ TIMEOUT_S = 90
 USO = ("uso: python3 ponte_mcp.py <servidor> --lista\n"
        "     python3 ponte_mcp.py <servidor> <ferramenta> ['<argumentos em JSON>']\n"
        f"servidores: {', '.join(SERVIDORES)}")
+# Só o que um servidor precisa pra rodar. Chave ou senha guardada em variável de ambiente fica de fora.
+AMBIENTE_PERMITIDO = ("PATH", "HOME", "USER", "LOGNAME", "SHELL", "TMPDIR", "TEMP", "TMP", "TZ", "LANG", "LC_ALL",
+                      "LC_CTYPE", "NODE_EXTRA_CA_CERTS", "SSL_CERT_FILE", "HTTP_PROXY", "HTTPS_PROXY", "NO_PROXY",
+                      "http_proxy", "https_proxy", "no_proxy", "PLAYWRIGHT_BROWSERS_PATH", "SYSTEMROOT", "SystemRoot",
+                      "WINDIR", "USERPROFILE", "APPDATA", "LOCALAPPDATA", "PROGRAMFILES", "ProgramFiles", "COMSPEC",
+                      "PATHEXT")
 AVISO_SEM_LOGIN = (">> ponte sem login: o seats.aero só enxerga os próximos 60 dias e não "
                    "mostra a Azul. Pra ver tudo, use o MCP nativo com conta Pro.")
 
@@ -43,7 +49,7 @@ def comando(servidor: str):
     """(comando, env) que abre o servidor; o comando é lista (stdio) ou URL (HTTP)."""
     if servidor not in SERVIDORES:
         raise SystemExit(f"ERRO: servidor desconhecido '{servidor}'. {USO}")
-    env = dict(os.environ)
+    env = {nome: os.environ[nome] for nome in AMBIENTE_PERMITIDO if nome in os.environ}
     var = "VIAGEM_BR_CMD_" + servidor.upper().replace("-", "_")
     if os.environ.get(var):
         try:

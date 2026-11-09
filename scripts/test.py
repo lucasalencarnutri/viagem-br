@@ -504,6 +504,18 @@ class TestPonteMcp(unittest.TestCase):
             codigo = ponte_mcp.main(list(args))
         return codigo, saida.getvalue(), erro.getvalue()
 
+    def test_servidor_nao_herda_segredo_do_ambiente(self):
+        ambiente = {**self.env, "PATH": "/caminho/teste", "ANTHROPIC_API_KEY": "segredo", "MINHA_SENHA": "segredo"}
+        with mock.patch.dict(os.environ, ambiente):
+            _, env = ponte_mcp.comando("google-flights")
+        self.assertEqual(env["PATH"], "/caminho/teste")
+        self.assertNotIn("ANTHROPIC_API_KEY", env)
+        self.assertNotIn("MINHA_SENHA", env)
+
+    def test_skill_proibe_compra_emissao_e_transferencia(self):
+        regras = (PASTA / "SKILL.md").read_text(encoding="utf-8").split("Regras de segurança:")[1][:2500]
+        self.assertIn("Nunca compre, emita, reserve ou transfira pontos", regras)
+
     def test_chamada_devolve_texto_e_ignora_log_solto(self):
         codigo, saida, _ = self.rodar("google-flights", "eco", '{"texto": "GRU-LIS"}')
         self.assertEqual(codigo, 0)
