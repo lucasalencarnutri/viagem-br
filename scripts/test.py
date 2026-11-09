@@ -20,7 +20,7 @@ from unittest import mock
 import audit
 import milheiro as modulo_milheiro
 import ponte_mcp
-from milheiro import (ECOS, FALTA_PRECO, FALTA_REGUA, Regua, comparar, estimar, interpretar_regua,
+from milheiro import (ECOS, FALTA_PRECO, FALTA_REGUA, Regua, comparar, estimar, gravar, interpretar_regua,
                       ler_precos, ler_regua, milheiro, numero_br, reais_br)
 
 PASTA = Path(__file__).resolve().parent.parent
@@ -30,6 +30,21 @@ EXEMPLO = PASTA / "exemplo" / "pesquisa-exemplo.md"
 HOJE = date(2026, 11, 8)
 REGUA_TESTE = Regua({"azul": 20.0, "smiles": 25.0, "latam": 30.0, "avios": 40.0, "miles_go": 42.0,
                      "flying_blue": 50.0, "connectmiles": 55.0}, HOJE)
+
+# Os testes nunca leem nem gravam a régua real de quem roda: o arquivo da pessoa
+# aponta pra um lugar que não existe, e só TestReguaDaPessoa troca por uma pasta temporária.
+_SEM_REGUA_PROPRIA = mock.patch.object(
+    modulo_milheiro, "ARQUIVO_USUARIO",
+    Path(tempfile.gettempdir()) / "viagem-br-teste-sem-regua" / "regua-milheiro.md")
+
+
+def setUpModule():
+    _SEM_REGUA_PROPRIA.start()
+
+
+def tearDownModule():
+    _SEM_REGUA_PROPRIA.stop()
+
 
 # Servidor MCP falso (stdio): sem node, sem rede e sem chave.
 SERVIDOR_FALSO = r'''
@@ -203,6 +218,144 @@ class TestMediaDeReferencia(unittest.TestCase):
 
     def test_estimativa_com_preco_proprio_nao_avisa(self):
         self.assertNotIn("média de referência", estimar(70000, "smiles", 380, {"smiles": 16.0}))
+
+
+class TestReguaDaPessoa(unittest.TestCase):
+    """A régua da pessoa mora fora da pasta da skill e vale por cima das médias do pacote."""
+
+    def setUp(self):
+        td = tempfile.TemporaryDirectory()
+        self.addCleanup(td.cleanup)
+        self.arq = Path(td.name) / "ainda-nao-existe" / "regua-milheiro.md"
+        troca_arquivo = mock.patch.object(modulo_milheiro, "ARQUIVO_USUARIO", self.arq)
+        troca_arquivo.start()
+        self.addCleanup(troca_arquivo.stop)
+        ECOS.clear()
+        self.addCleanup(ECOS.clear)
+
+    def escrever(self, linhas_regua="", data="", linhas_preco=""):
+        self.arq.parent.mkdir(parents=True, exist_ok=True)
+        self.arq.write_text(
+            f"<!-- regua:inicio -->\n| Programa | Valor |\n|---|---|\n{linhas_regua}\n<!-- regua:fim -->\n\n"
+            f"Última atualização da régua (DD/MM/AAAA): {data}\n\n"
+            f"<!-- preco:inicio -->\n| Programa | Preço |\n|---|---|\n{linhas_preco}\n<!-- preco:fim -->\n",
+            encoding="utf-8")
+
+    def test_lugar_padrao_fica_fora_da_pasta_da_skill(self):
+        self.assertEqual(modulo_milheiro.PASTA_DO_USUARIO, Path.home() / ".viagem-br")
+        self.assertNotIn(PASTA, modulo_milheiro.PASTA_DO_USUARIO.parents)
+
+    def test_sem_arquivo_da_pessoa_valem_as_medias(self):
+        r = ler_regua()
+        self.assertEqual(r.valores["smiles"], 16)
+        self.assertIn("smiles", r.medias)
+
+    def test_gravar_cria_o_arquivo_e_a_pasta(self):
+        gravar("regua", "smiles", 20.5, hoje=HOJE)
+        self.assertTrue(self.arq.exists())
+
+    def test_valor_da_pessoa_vence_a_media_so_naquele_programa(self):
+        gravar("regua", "smiles", 20.5, hoje=HOJE)
+        r = ler_regua()
+        self.assertEqual(r.valores["smiles"], 20.5)
+        self.assertNotIn("smiles", r.medias)
+        self.assertEqual(r.valores["azul"], 14)
+        self.assertIn("azul", r.medias)
+
+    def test_resultado_chama_de_sua_regua_so_o_que_e_dela(self):
+        gravar("regua", "smiles", 20.5, hoje=HOJE)
+        dela = comparar(55.6, "smiles", hoje=HOJE)
+        self.assertIn("acima do valor da sua régua para smiles (R$ 20,50)", dela)
+        self.assertNotIn("MÉDIA DE REFERÊNCIA", dela)
+        self.assertIn("[MÉDIA DE REFERÊNCIA", comparar(55.6, "azul", hoje=HOJE))
+
+    def test_gravar_de_novo_troca_o_valor_sem_duplicar_a_linha(self):
+        gravar("regua", "smiles", 20.5, hoje=HOJE)
+        gravar("regua", "Smiles", 22, hoje=HOJE)
+        self.assertEqual(ler_regua().valores["smiles"], 22)
+        self.assertEqual(self.arq.read_text(encoding="utf-8").casefold().count("| smiles |"), 1)
+
+    def test_codigo_do_seats_aero_cai_na_linha_do_programa(self):
+        gravar("regua", "Avios", 50, hoje=HOJE)
+        gravar("regua", "iberia", 52, hoje=HOJE)
+        texto = self.arq.read_text(encoding="utf-8")
+        self.assertEqual(ler_regua().valores["avios"], 52)
+        self.assertIn("| Avios | 52,00 |", texto)
+        self.assertNotIn("iberia", texto.casefold())
+
+    def test_validade_segue_a_data_de_quem_deu_o_valor(self):
+        # valor dela com 100 dias: vencido. Média do pacote, de 08/11/2026: no prazo.
+        gravar("regua", "smiles", 20.5, hoje=HOJE - timedelta(days=100))
+        self.assertIn("[RECONFIRMAR", comparar(55.6, "smiles", hoje=HOJE))
+        self.assertNotIn("[RECONFIRMAR", comparar(55.6, "azul", hoje=HOJE))
+
+    def test_valor_novo_da_pessoa_nao_herda_o_vencimento_das_medias(self):
+        depois = HOJE + timedelta(days=200)
+        gravar("regua", "smiles", 20.5, hoje=depois)
+        self.assertNotIn("[RECONFIRMAR", comparar(55.6, "smiles", hoje=depois))
+        self.assertIn("[RECONFIRMAR", comparar(55.6, "azul", hoje=depois))
+
+    def test_gravar_preco_vale_na_estimativa(self):
+        gravar("preco", "smiles", 18, hoje=HOJE)
+        self.assertEqual(ler_precos()["smiles"], 18)
+        dela = estimar(70000, "smiles", 380)
+        self.assertIn("R$ 18,00 o milheiro", dela)
+        self.assertNotIn("média de referência", dela)
+        self.assertIn("média de referência", estimar(70000, "azul", 380))
+
+    def test_gravar_preco_nao_mexe_na_regua(self):
+        gravar("preco", "smiles", 18, hoje=HOJE)
+        r = ler_regua()
+        self.assertEqual(r.valores["smiles"], 16)
+        self.assertIn("smiles", r.medias)
+
+    def test_gravar_recusa_zero(self):
+        with self.assertRaises(ValueError):
+            gravar("regua", "smiles", 0, hoje=HOJE)
+        self.assertFalse(self.arq.exists())
+
+    def test_gravar_recusa_tabela_desconhecida(self):
+        with self.assertRaises(ValueError):
+            gravar("milhas", "smiles", 20, hoje=HOJE)
+
+    def test_programa_fora_das_tabelas_grava_e_pede_conferencia(self):
+        aviso = gravar("regua", "smlies", 20, hoje=HOJE)
+        self.assertIn("confira o nome", aviso)
+        self.assertEqual(ler_regua().valores["smlies"], 20)
+
+    def test_programa_conhecido_grava_sem_pedir_conferencia(self):
+        self.assertNotIn("confira o nome", gravar("regua", "iberia", 50, hoje=HOJE))
+
+    def test_arquivo_editado_a_mao_vale(self):
+        self.escrever("| Smiles | R$ 22,50 |", HOJE.strftime("%d/%m/%Y"), "| Azul | 12 |")
+        self.assertEqual(ler_regua().valores["smiles"], 22.5)
+        self.assertEqual(ler_precos()["azul"], 12)
+
+    def test_linha_com_media_no_arquivo_da_pessoa_nao_vira_valor_dela(self):
+        # quem copiou a tabela do pacote inteira não transforma as médias em régua própria
+        self.escrever("| Smiles | 99 (média) |\n| Azul | 15 |", HOJE.strftime("%d/%m/%Y"))
+        r = ler_regua()
+        self.assertEqual(r.valores["smiles"], 16)
+        self.assertIn("smiles", r.medias)
+        self.assertEqual(r.valores["azul"], 15)
+
+    def test_cli_grava_e_depois_compara_com_o_valor_dela(self):
+        def rodar(*args):
+            saida = io.StringIO()
+            with mock.patch.object(sys, "argv", ["milheiro.py", *args]), contextlib.redirect_stdout(saida):
+                modulo_milheiro.main()
+            return saida.getvalue()
+        gravou = rodar("--gravar", "regua", "smiles", "R$ 20,50")
+        self.assertIn("smiles", gravou.casefold())
+        self.assertIn("20,50", gravou)
+        self.assertIn(str(self.arq), gravou)
+        self.assertIn("valor da sua régua",
+                      rodar("--cash", "4272", "--taxas", "380", "--milhas", "70000", "--programa", "smiles"))
+
+    def test_cli_sem_gravar_continua_exigindo_milhas_e_programa(self):
+        with mock.patch.object(sys, "argv", ["milheiro.py", "--cash", "100", "--taxas", "10"]), \
+                self.assertRaises(SystemExit), contextlib.redirect_stderr(io.StringIO()):
+            modulo_milheiro.main()
 
 
 class TestEstimativaEmReais(unittest.TestCase):
@@ -388,7 +541,7 @@ class TestCliEstimar(unittest.TestCase):
 
 
 class TestDocumentacao(unittest.TestCase):
-    ARQUIVOS = ["SKILL.md", "README.md", *(f"references/{n}" for n in (
+    ARQUIVOS = ["SKILL.md", "README.md", "MUDANCAS.md", *(f"references/{n}" for n in (
         "hoteis-trivago.md",
         "armadilhas.md", "extractor-navegador.md", "fatos-programas.md", "regua-milheiro.md", "seats-aero.md"))]
 
@@ -475,10 +628,29 @@ class TestDocumentacao(unittest.TestCase):
         self.assertIn("34 em `programs`", seats)
         self.assertIn("`jetblue`", seats)
 
-    def test_textos_ensinam_a_tirar_a_marca_de_media(self):
+    def test_textos_mandam_a_regua_da_pessoa_pra_fora_da_pasta(self):
         for nome in ("SKILL.md", "README.md", "references/regua-milheiro.md"):
             with self.subTest(arquivo=nome):
-                self.assertIn("`(média)`", self.ler(nome))
+                self.assertIn("~/.viagem-br/regua-milheiro.md", self.ler(nome))
+        self.assertIn("scripts/milheiro.py --gravar regua", self.ler("SKILL.md"))
+        self.assertIn("scripts/milheiro.py --gravar preco", self.ler("SKILL.md"))
+
+    def test_nenhum_texto_manda_editar_a_tabela_dentro_da_pasta(self):
+        self.assertNotIn("~/.claude/skills/viagem-br/references/regua-milheiro.md", self.ler("README.md"))
+        self.assertNotIn("apague o `(média)`", self.ler("SKILL.md") + self.ler("README.md"))
+
+    def test_lista_de_mudancas_tem_versao_e_data_em_ordem(self):
+        versoes = re.findall(r"^## (\d+)\.(\d+)\.(\d+) \((\d{2}/\d{2}/\d{4})\)$",
+                             self.ler("MUDANCAS.md"), re.MULTILINE)
+        self.assertGreaterEqual(len(versoes), 4)
+        numeros = [tuple(int(n) for n in v[:3]) for v in versoes]
+        self.assertEqual(numeros, sorted(numeros, reverse=True))  # a mais nova no topo
+        self.assertEqual(len(set(numeros)), len(numeros))
+
+    def test_textos_dizem_onde_esta_a_versao(self):
+        for nome in ("SKILL.md", "README.md"):
+            with self.subTest(arquivo=nome):
+                self.assertIn("MUDANCAS.md", self.ler(nome))
 
     def test_sem_travessao_nos_textos(self):
         for nome in [*self.ARQUIVOS, "exemplo/pesquisa-exemplo.md"]:

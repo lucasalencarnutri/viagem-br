@@ -144,11 +144,11 @@ Deu certo se terminar com `OK`.
 
 ## Ajuste a sua régua
 
-A tabela já vem com médias de referência de novembro de 2026, então a skill funciona de cara. Troque pelos seus valores, porque esse número depende de como você compra milhas. Programa sem valor sai `[FALTA: valor da sua régua]` no lugar da comparação.
+A skill já vem com médias de referência de novembro de 2026, então funciona de cara. Troque pelos seus valores, porque esse número depende de como você compra milhas. Enquanto valer a média, o resultado sai marcado `[MÉDIA DE REFERÊNCIA]`. Programa sem valor nenhum sai `[FALTA: valor da sua régua]` no lugar da comparação.
 
-Pra ajustar, diga pro Claude "preenche minha régua do milheiro" e informe os valores. Ou abra o arquivo `~/.claude/skills/viagem-br/references/regua-milheiro.md` num editor de texto e complete a tabela "Sua régua" e a data. Ao trocar um valor, apague o `(média)` ao lado dele: enquanto estiver lá, o resultado sai marcado como média de referência.
+Pra ajustar, diga pro Claude "preenche minha régua do milheiro" e informe os valores. Ele grava em `~/.viagem-br/regua-milheiro.md`, um arquivo seu que fica fora da pasta da skill: atualizar a skill não mexe nele. Você pode preencher só os programas que usa, e os outros seguem na média. Quem preferir pode abrir esse arquivo num editor de texto depois que ele existir.
 
-A mesma página tem uma segunda tabela, também já preenchida com médias: "Seu preço de referência", com o que se costuma pagar por 1.000 milhas. Com ela, a skill diz quanto a emissão fica em reais, mais ou menos. Sem ela, escreve `[FALTA: seu preço de referência]`. O veredito não muda.
+Dá pra gravar também o seu preço de referência, que é o que você costuma pagar por 1.000 milhas. Com ele, a skill diz quanto a emissão fica em reais, mais ou menos. O veredito não muda.
 
 Como achar o seu número: olhe sua última compra de milhas ou seu clube e faça valor pago ÷ milhas recebidas × 1.000. Exemplo com números inventados: R$ 600 por 20.000 milhas dá R$ 30 por 1.000.
 
@@ -176,11 +176,15 @@ Se a skill não entrar sozinha, comece o pedido com `/viagem-br`.
 
 ## Atualizar
 
-Antes de instalar uma versão nova, guarde uma cópia da sua tabela da régua, porque o arquivo novo substitui o antigo.
+A sua versão está no topo do arquivo `~/.claude/skills/viagem-br/MUDANCAS.md`, e a mais nova, no começo do guia de instalação. Se preferir, pergunte pro Claude "qual versão da Viagem BR eu tenho?".
+
+Pra atualizar, baixe o arquivo novo e repita o passo 3. A sua régua fica em `~/.viagem-br/` e não é tocada.
+
+Sua pasta não tem `MUDANCAS.md`? Então a versão é anterior à 1.1.0, e a régua ficava dentro da pasta da skill. Se você preencheu, anote os valores antes de atualizar e peça pro Claude gravar de novo depois.
 
 ## Privacidade
 
-A skill não manda nada pra quem a criou. As buscas vão pros serviços que você ligou (Google Flights, seats.aero, Kiwi, Skiplagged), e a conversa segue as regras do Claude. A skill nunca precisa da sua senha de programa, chave de API ou dado de cartão: se alguma página pedir isso pro Claude, não forneça.
+A skill não manda nada pra quem a criou. Os valores da sua régua ficam só no seu computador, em `~/.viagem-br/`. As buscas vão pros serviços que você ligou (Google Flights, seats.aero, Kiwi, Skiplagged), e a conversa segue as regras do Claude. A skill nunca precisa da sua senha de programa, chave de API ou dado de cartão: se alguma página pedir isso pro Claude, não forneça.
 
 ## Crédito
 
