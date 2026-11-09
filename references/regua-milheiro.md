@@ -7,7 +7,7 @@ Como a skill compara uma emissão em milhas com o preço em dinheiro e chega ao 
 milheiro da emissão = (preço cash − taxas de emissão) ÷ milhas × 1.000
 
 - Preço cash: o da mesma rota, mesma cabine, mesmas datas. No Brasil ele já vem com a taxa de embarque embutida; por isso a taxa sai do lado do dinheiro.
-- Taxas de emissão: as cobradas em dinheiro pelo programa que emite. Taxa zerada vinda do seats-aero é placeholder do cache: valor real só no checkout. Nunca tratar 0 como fato.
+- Taxas de emissão: as cobradas em dinheiro pelo programa que emite. Taxa zerada vinda do seats-aero é placeholder do cache: valor real só no checkout. Nunca tratar 0 como fato: nesse caso, `--taxas desconhecida` no script, e o resultado sai marcado.
 - Mesma base de passageiros: preço, taxas e milhas do grupo inteiro, ou os três por pessoa (armadilha 31).
 - Taxa igual ou maior que o preço em dinheiro: o milheiro dá zero ou negativo e o veredito é pagar em dinheiro.
 

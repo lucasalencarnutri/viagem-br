@@ -5,7 +5,9 @@ Checa: seções na ordem AVISOS → TABELA → VEREDITO → MILHAS → PRÓXIMOS
 linha `>>` nos AVISOS; as 4 células da matriz (dinheiro/milhas × econômica/executiva)
 com piso · densidade ou marcador de vazio; `[FALTA:` do cabeçalho casado com os AVISOS;
 chave de API exposta (pro_...).
-CLI: `python3 audit.py <arquivo.md>`. Exit 0 libera; exit 1 lista uma violação por linha.
+Com --recorte (só um pedaço do método), exige AVISOS e VEREDITO e confere só as células que aparecem.
+Confere formato, não se o número está certo.
+CLI: `python3 audit.py [--recorte] <arquivo.md>`. Exit 0 libera; exit 1 lista uma violação por linha.
 """
 import re
 import sys
@@ -17,7 +19,7 @@ _PROXIMO_HEADER_RE = re.compile(r"^##\s", re.MULTILINE)
 CELULAS = ["dinheiro × econômica", "dinheiro × executiva",
            "milhas × econômica", "milhas × executiva"]
 _PISO_DINHEIRO_RE = re.compile(r"R\$\s*[\d.,]+\s*·\s*\d+")
-_PISO_MILHAS_RE = re.compile(r"[\d.,]+\s*k\s+milhas[^\n]*·\s*\d+")
+_PISO_MILHAS_RE = re.compile(r"[\d.,]+\s*(?:k|mil)\s+(?:milhas|pontos|avios)[^\n]*·\s*\d+", re.IGNORECASE)
 _MARCADOR_VAZIO = ("sem estoque no cache", "sem voo", "sem dado: ferramenta bloqueada",
                    "sem dado: seats.aero sem login", "não pesquisada: rota doméstica",
                    "sem dado: programa fora do seats.aero")
@@ -39,7 +41,7 @@ def _celula_re(rotulo: str) -> re.Pattern:
     return re.compile(re.escape(a.strip()) + r"\s*×\s*" + re.escape(b.strip()))
 
 
-def auditar(texto: str) -> list[str]:
+def auditar(texto: str, recorte: bool = False) -> list[str]:
     """Devolve a lista de violações (vazia = SAÍDA conforme o formato da skill)."""
     viol = []
 
@@ -48,7 +50,8 @@ def auditar(texto: str) -> list[str]:
     for nome in SECOES:
         m = _SECAO_RE[nome].search(texto)
         if m is None:
-            viol.append(f"seção {nome} ausente")
+            if not recorte or nome in ("AVISOS", "VEREDITO"):
+                viol.append(f"seção {nome} ausente")
         else:
             pos[nome] = m.start()
     esperadas = [n for n in SECOES if n in pos]
@@ -73,8 +76,9 @@ def auditar(texto: str) -> list[str]:
             rx = _celula_re(rotulo)
             da_celula = [l for l in linhas if rx.search(l)]
             if not da_celula:
-                viol.append(f"célula ausente na TABELA: {rotulo} "
-                            "(a matriz completa exige as 4 células)")
+                if not recorte:
+                    viol.append(f"célula ausente na TABELA: {rotulo} "
+                                "(a matriz completa exige as 4 células)")
             elif not any(_PISO_DINHEIRO_RE.search(l) or _PISO_MILHAS_RE.search(l)
                          or any(marc in l for marc in _MARCADOR_VAZIO)
                          for l in da_celula):
@@ -97,16 +101,19 @@ def auditar(texto: str) -> list[str]:
 
 
 def main() -> None:
-    if len(sys.argv) != 2:
-        print("uso: python3 audit.py <arquivo.md>", file=sys.stderr)
+    args = sys.argv[1:]
+    recorte = "--recorte" in args
+    args = [a for a in args if a != "--recorte"]
+    if len(args) != 1:
+        print("uso: python3 audit.py [--recorte] <arquivo.md>", file=sys.stderr)
         raise SystemExit(2)
     try:
-        with open(sys.argv[1], encoding="utf-8") as f:
+        with open(args[0], encoding="utf-8") as f:
             texto = f.read()
     except OSError as e:
         print(f"ERRO: {e}", file=sys.stderr)
         raise SystemExit(2)
-    viol = auditar(texto)
+    viol = auditar(texto, recorte=recorte)
     for v in viol:
         print(v)
     raise SystemExit(1 if viol else 0)

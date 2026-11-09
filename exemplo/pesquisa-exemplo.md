@@ -23,8 +23,8 @@ Matriz completa, cada célula com PISO · DENSIDADE (sujeito a disponibilidade):
 |---|---|
 | dinheiro × econômica | R$ 7.431 · 11 diretas/semana |
 | dinheiro × executiva | R$ 14.980 · 4 opções/dia |
-| milhas × econômica | 128k milhas + R$ 380 · 2 programas (Azul, Smiles) |
-| milhas × executiva | 390k milhas + R$ 350 · 2 programas (Azul, Smiles) |
+| milhas × econômica (Smiles) | 128k milhas + R$ 380 · 3 voos |
+| milhas × executiva (Azul) | 390k milhas + R$ 350 · 2 voos |
 | milhas × executiva (LATAM Pass) | sem dado: programa fora do seats.aero [FALTA: busca manual no programa] |
 
 Finalistas em dinheiro: companhia que voa | rota e conexões | duração total |
@@ -56,8 +56,7 @@ da mesma rota/cabine/datas):
 
 ## PRÓXIMOS PASSOS
 
-- Baseline de track criado (fictício): GRU–NRT, ida 2026-10-15, 1ª observação
-  hoje; tendência só a partir da 2ª rodada.
+- Monitoramento não criado: peça se quiser acompanhar o preço desta rota.
 - URL de evidência do preço em dinheiro (fictícia):
   https://www.google.com/travel/flights?q=GRU-NRT-2026-10-15-economy&curr=BRL
 - Na próxima rodada: repetir o passo 7A (get_flights) e comparar `minutes_old` e

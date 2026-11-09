@@ -33,11 +33,16 @@ Exemplos:
   milheiro.py --estimar --milhas 70000 --taxas 245 --programa smiles
   milheiro.py --gravar regua smiles 20,50
   milheiro.py --gravar regua smiles 20,50 --gravar preco smiles 18
+  milheiro.py --cash 2173 --taxas desconhecida --milhas 96000 --programa smiles
+  milheiro.py --cambio USD
 """
 import argparse
+import json
 import re
+import urllib.error
+import urllib.request
 from collections import namedtuple
-from datetime import date
+from datetime import date, timedelta
 from functools import partial
 from pathlib import Path
 
@@ -56,6 +61,14 @@ _MEDIA_RE = re.compile(r"\(\s*m[eé]dia\s*\)", re.IGNORECASE)
 AVISO_MEDIA = ("[MÉDIA DE REFERÊNCIA: não é o seu custo; grave o seu valor com "
                "--gravar regua <programa> <valor>.]")
 TABELAS = {"regua": "valor máximo da sua régua", "preco": "seu preço de referência"}
+TAXA_DESCONHECIDA = "desconhecida"
+AVISO_TAXA = ("[TAXA DESCONHECIDA: calculado com taxa zero, então o milheiro real é menor que esse. "
+              "Confira a taxa no checkout do programa.]")
+PTAX_URL = ("https://olinda.bcb.gov.br/olinda/servico/PTAX/versao/v1/odata/"
+            "CotacaoMoedaPeriodo(moeda=@moeda,dataInicial=@dataInicial,dataFinalCotacao=@dataFinalCotacao)"
+            "?@moeda='{moeda}'&@dataInicial='{inicio}'&@dataFinalCotacao='{fim}'&$format=json"
+            "&$select=cotacaoVenda,dataHoraCotacao&$filter=tipoBoletim%20eq%20'Fechamento'"
+            "&$orderby=dataHoraCotacao%20desc&$top=1")
 
 MODELO_DO_USUARIO = """# Minha régua do milheiro (Viagem BR)
 
@@ -265,6 +278,37 @@ def ler_precos(caminho: Path = None) -> dict:
     return _precos(caminho)[0]
 
 
+def taxa_br(txt: str):
+    """Taxa em reais, ou "desconhecida" quando o cache não informa ("?" também vale)."""
+    if txt.strip().casefold() in (TAXA_DESCONHECIDA, "?"):
+        return TAXA_DESCONHECIDA
+    return numero_br(txt, eco_milhar=True)
+
+
+def cambio(moeda: str, hoje=None) -> str:
+    """Última cotação PTAX de venda do Banco Central. Só manda o código da moeda e as datas.
+
+    A janela volta 7 dias porque fim de semana e feriado não têm boletim."""
+    codigo = moeda.strip().upper()
+    if not re.fullmatch(r"[A-Z]{3}", codigo):
+        raise ValueError(f"código de moeda inválido: {moeda!r} (use, por exemplo, USD, EUR ou CAD)")
+    fim = hoje or date.today()
+    url = PTAX_URL.format(moeda=codigo, inicio=f"{fim - timedelta(days=7):%m-%d-%Y}", fim=f"{fim:%m-%d-%Y}")
+    pedido = urllib.request.Request(url, headers={"User-Agent": "viagem-br/1"})
+    falta = (f"[FALTA: câmbio de {codigo}] O Banco Central não devolveu cotação agora. Sem câmbio, "
+             "não calcule o milheiro de taxa cobrada nessa moeda.")
+    try:
+        with urllib.request.urlopen(pedido, timeout=20) as resposta:
+            valores = json.loads(resposta.read().decode("utf-8")).get("value") or []
+    except (urllib.error.URLError, OSError, ValueError):
+        return falta
+    if not valores:
+        return falta
+    valor = f"{valores[0]['cotacaoVenda']:.4f}".replace(".", ",")
+    quando = date.fromisoformat(valores[0]["dataHoraCotacao"][:10])
+    return f"{codigo}: R$ {valor} (PTAX de venda do Banco Central, fechamento de {quando:%d/%m/%Y})"
+
+
 def milheiro(preco_cash: float, taxas: float, milhas: int) -> float:
     return (preco_cash - taxas) / milhas * 1000
 
@@ -394,8 +438,9 @@ def main() -> None:
     p.add_argument("--cash", type=partial(numero_br, eco_milhar=True),
                    help="preço em dinheiro da mesma rota/cabine/datas, na mesma base de "
                         "passageiros de --milhas e --taxas (aceita R$ 1.234,56)")
-    p.add_argument("--taxas", type=partial(numero_br, eco_milhar=True),
-                   help="taxas de emissão em R$ (aceita R$ 1.234,56)")
+    p.add_argument("--taxas", type=taxa_br,
+                   help="taxas de emissão em R$ (aceita R$ 1.234,56), ou a palavra desconhecida "
+                        "quando o cache não informa")
     p.add_argument("--milhas", type=numero_br,
                    help="milhas exigidas na emissão (50.000 → 50000)")
     p.add_argument("--programa",
@@ -405,7 +450,15 @@ def main() -> None:
     p.add_argument("--gravar", nargs=3, action="append", metavar=("TABELA", "PROGRAMA", "VALOR"),
                    help="guarda um valor seu em ~/.viagem-br/regua-milheiro.md. TABELA é regua "
                         "(máximo que aceita pagar) ou preco (o que costuma pagar). Pode repetir")
+    p.add_argument("--cambio", metavar="MOEDA",
+                   help="última cotação PTAX do Banco Central da moeda (USD, EUR, CAD...)")
     a = p.parse_args()
+    if a.cambio:
+        try:
+            print(cambio(a.cambio))
+        except ValueError as erro:
+            p.error(str(erro))
+        return
     if a.gravar:
         for tabela, programa, valor in a.gravar:
             try:
@@ -417,14 +470,17 @@ def main() -> None:
         return
     if a.milhas is None or a.programa is None:
         p.error("--milhas e --programa são obrigatórios (ou use --gravar)")
+    desconhecida = a.taxas == TAXA_DESCONHECIDA
     if a.estimar:
-        resultado = estimar(a.milhas, a.programa, a.taxas)
+        resultado = estimar(a.milhas, a.programa, None if desconhecida else a.taxas)
     else:
         if a.cash is None or a.taxas is None:
             p.error("--cash e --taxas são obrigatórios fora do modo --estimar")
         if a.milhas == 0:
             p.error("--milhas 0 não divide: conferir o valor")
-        resultado = comparar(milheiro(a.cash, a.taxas, a.milhas), a.programa)
+        resultado = comparar(milheiro(a.cash, 0.0 if desconhecida else a.taxas, a.milhas), a.programa)
+        if desconhecida:
+            resultado += " " + AVISO_TAXA
     for eco in ECOS:
         print(eco)
     print(resultado)

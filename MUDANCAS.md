@@ -2,6 +2,16 @@
 
 A versão mais nova fica no topo. A versão disponível pra baixar aparece no começo do guia de instalação.
 
+## 1.4.0 (09/11/2026)
+
+- Cidade com mais de um aeroporto: São Paulo, Rio e Belo Horizonte entram inteiras numa busca só.
+- A busca de voo passa a trazer 20 opções, e a contagem de voos fica mais fiel.
+- Câmbio do dia pelo Banco Central, pra converter taxa cobrada em dólar ou euro.
+- Taxa que o seats.aero não informa sai marcada, em vez de entrar como zero.
+- Milhas aparecem em uma linha por programa.
+- O registro de preço no histórico só é criado se você pedir pra monitorar.
+- Pergunta rápida e pesquisa completa têm critério claro, e o objetivo que faltar é deduzido e dito no começo.
+
 ## 1.3.0 (09/11/2026)
 
 - Voo dentro do Brasil: a executiva só é pesquisada se você pedir, e as duas células saem "não pesquisada: rota doméstica".

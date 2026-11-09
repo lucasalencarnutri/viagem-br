@@ -194,7 +194,7 @@ Sua pasta não tem `MUDANCAS.md`? Então a versão é anterior à 1.1.0, e a ré
 
 ## Privacidade
 
-A skill não manda nada pra quem a criou. Os valores da sua régua ficam só no seu computador, em `~/.viagem-br/`. As buscas vão pros serviços que você ligou (Google Flights, seats.aero, Kiwi, Skiplagged), e a conversa segue as regras do Claude. A skill nunca precisa da sua senha de programa, chave de API ou dado de cartão: se alguma página pedir isso pro Claude, não forneça.
+A skill não manda nada pra quem a criou. Os valores da sua régua ficam só no seu computador, em `~/.viagem-br/`. As buscas vão pros serviços que você ligou (Google Flights, seats.aero, Kiwi, Skiplagged, Trivago), a consulta de câmbio vai ao Banco Central levando só a moeda e as datas, e a conversa segue as regras do Claude. A skill nunca precisa da sua senha de programa, chave de API ou dado de cartão: se alguma página pedir isso pro Claude, não forneça.
 
 ## Crédito
 

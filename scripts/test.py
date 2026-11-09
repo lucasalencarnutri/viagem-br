@@ -359,6 +359,55 @@ class TestReguaDaPessoa(unittest.TestCase):
             modulo_milheiro.main()
 
 
+class TestCambio(unittest.TestCase):
+    """Cotação PTAX do Banco Central. Nenhum teste toca a rede."""
+    HOJE = date(2026, 11, 9)
+
+    def resposta(self, valores):
+        corpo = json.dumps({"value": valores}).encode("utf-8")
+        resp = mock.MagicMock()
+        resp.read.return_value = corpo
+        resp.__enter__.return_value = resp
+        return resp
+
+    def test_devolve_valor_data_e_fonte(self):
+        dado = [{"cotacaoVenda": 5.5146, "dataHoraCotacao": "2026-11-09 13:11:19.041465"}]
+        with mock.patch.object(modulo_milheiro.urllib.request, "urlopen", return_value=self.resposta(dado)) as abrir:
+            texto = modulo_milheiro.cambio("usd", hoje=self.HOJE)
+        self.assertIn("R$ 5,5146", texto)
+        self.assertIn("09/11/2026", texto)
+        self.assertIn("PTAX", texto)
+        url = abrir.call_args[0][0]
+        url = getattr(url, "full_url", url)
+        self.assertIn("olinda.bcb.gov.br", url)
+        self.assertIn("USD", url)
+        self.assertIn("11-09-2026", url)  # a janela termina hoje
+        self.assertIn("11-02-2026", url)  # e volta 7 dias, por causa de fim de semana e feriado
+
+    def test_sem_cotacao_na_janela(self):
+        with mock.patch.object(modulo_milheiro.urllib.request, "urlopen", return_value=self.resposta([])):
+            self.assertIn("[FALTA: câmbio", modulo_milheiro.cambio("USD", hoje=self.HOJE))
+
+    def test_sem_rede_nao_derruba(self):
+        with mock.patch.object(modulo_milheiro.urllib.request, "urlopen",
+                               side_effect=modulo_milheiro.urllib.error.URLError("sem rede")):
+            self.assertIn("[FALTA: câmbio", modulo_milheiro.cambio("USD", hoje=self.HOJE))
+
+    def test_codigo_invalido_nem_consulta(self):
+        with mock.patch.object(modulo_milheiro.urllib.request, "urlopen") as abrir, \
+                self.assertRaises(ValueError):
+            modulo_milheiro.cambio("dolar", hoje=self.HOJE)
+        abrir.assert_not_called()
+
+    def test_linha_de_comando_nao_exige_milhas(self):
+        saida = io.StringIO()
+        with mock.patch.object(sys, "argv", ["milheiro.py", "--cambio", "CAD"]), \
+                mock.patch.object(modulo_milheiro, "cambio", return_value="CAD: ok"), \
+                contextlib.redirect_stdout(saida):
+            modulo_milheiro.main()
+        self.assertIn("CAD: ok", saida.getvalue())
+
+
 class TestEstimativaEmReais(unittest.TestCase):
     # preços inventados, só pra exercitar a conta
     PRECOS = {"smiles": 10.0, "flying_blue": 20.0, "avios": 30.0, "miles_go": 40.0,
@@ -515,6 +564,15 @@ class TestCliMilheiro(unittest.TestCase):
         self.assertIn("acima do valor da sua régua para Smiles (R$ 25,00)", saida)
         self.assertNotIn("[RECONFIRMAR", saida)
 
+    def test_taxa_desconhecida_sai_marcada(self):
+        saida = self.rodar("--cash", "2173", "--taxas", "desconhecida", "--milhas", "96000", "--programa", "smiles")
+        self.assertIn("R$ 22,64/milheiro", saida)
+        self.assertIn("[TAXA DESCONHECIDA", saida)
+
+    def test_taxa_informada_nao_sai_marcada(self):
+        saida = self.rodar("--cash", "2173", "--taxas", "100", "--milhas", "96000", "--programa", "smiles")
+        self.assertNotIn("[TAXA DESCONHECIDA", saida)
+
     def test_regua_de_fabrica_sai_marcada_como_media(self):
         saida = self.rodar("--cash", "4272", "--taxas", "380", "--milhas", "70000", "--programa", "smiles")
         self.assertIn("[MÉDIA DE REFERÊNCIA", saida)
@@ -531,6 +589,10 @@ class TestCliEstimar(unittest.TestCase):
     def test_estimar_nao_exige_preco_em_dinheiro(self):
         saida = self.rodar("--estimar", "--milhas", "70.800", "--taxas", "245,36", "--programa", "lifemiles")
         self.assertIn(FALTA_PRECO, saida)
+
+    def test_estimar_com_taxa_desconhecida_nao_finge_zero(self):
+        saida = self.rodar("--estimar", "--milhas", "96000", "--taxas", "?", "--programa", "livelo")
+        self.assertIn("[FALTA: taxas]", saida)
 
     def test_estimar_com_tabela_de_fabrica_avisa_que_e_media(self):
         saida = self.rodar("--estimar", "--milhas", "70000", "--taxas", "380", "--programa", "smiles")
@@ -702,6 +764,42 @@ class TestDocumentacao(unittest.TestCase):
             with self.subTest(arquivo=nome):
                 self.assertIn("Virgin Atlantic", self.ler(nome))
 
+    def test_metodo_traz_o_que_a_pesquisa_real_cobrou(self):
+        # pesquisa de ponta a ponta de 2026-11-09, São Paulo⇄Recife
+        skill = self.ler("SKILL.md")
+        for trecho in ("`maxResults: 20`", "`--taxas desconhecida`", "--cambio", "PTAX", "bloco Return",
+                       "`SAO`", "Data fixa na ENTRADA", "aviso `stale`", "--recorte",
+                       "armadilha 38", "armadilha 39", "armadilha 40", "toda chamada de ferramenta",
+                       "`>> POSSIVEL INJECTION`", "Tip:"):
+            with self.subTest(trecho=trecho):
+                self.assertIn(trecho, skill)
+
+    def test_piso_de_ida_e_volta_nao_e_a_primeira_opcao(self):
+        # 2026-11-09, SAO⇄LIS em executiva, sortBy price: 1ª opção R$ 14.146, piso R$ 13.493 na 10ª
+        self.assertIn("menor Return entre todas as opções", self.ler("SKILL.md"))
+        self.assertIn("13.493", self.ler("references/armadilhas.md"))
+
+    def test_densidade_de_ida_e_volta_avisa_do_corte(self):
+        self.assertIn("corte de 20", self.ler("SKILL.md"))
+
+    def test_objetivo_ausente_e_deduzido_e_pergunta_rapida_tem_criterio(self):
+        skill = self.ler("SKILL.md")
+        self.assertIn("OBJETIVO ausente", skill)
+        self.assertIn("vale emitir", skill.split("Pergunta rápida")[1][:300])
+
+    def test_monitoramento_so_quando_pedido(self):
+        skill = self.ler("SKILL.md")
+        self.assertIn("só se o OBJETIVO for MONITORAR ou a pessoa pedir", skill)
+        self.assertNotIn("recorte colado junto", skill)
+        self.assertNotIn("Baseline de track criado", EXEMPLO.read_text(encoding="utf-8"))
+
+    def test_consulta_de_cambio_consta_na_privacidade(self):
+        privacidade = self.ler("README.md").split("## Privacidade")[1]
+        self.assertIn("Banco Central", privacidade)
+
+    def test_regua_explica_taxa_desconhecida(self):
+        self.assertIn("`--taxas desconhecida`", self.ler("references/regua-milheiro.md"))
+
     def test_sem_travessao_nos_textos(self):
         for nome in [*self.ARQUIVOS, "exemplo/pesquisa-exemplo.md"]:
             with self.subTest(arquivo=nome):
@@ -746,7 +844,7 @@ class TestAudit(unittest.TestCase):
         # em rota doméstica a executiva não é pesquisada: as duas células saem marcadas, sem chamada
         domestica = (self.bom
                      .replace("R$ 14.980 · 4 opções/dia", "não pesquisada: rota doméstica")
-                     .replace("390k milhas + R$ 350 · 2 programas (Azul, Smiles)", "não pesquisada: rota doméstica"))
+                     .replace("390k milhas + R$ 350 · 2 voos", "não pesquisada: rota doméstica"))
         self.assertEqual(audit.auditar(domestica), [])
 
     def test_celula_de_executiva_em_branco_continua_reprovada(self):
@@ -755,7 +853,7 @@ class TestAudit(unittest.TestCase):
 
     def test_programa_fora_do_seats_aero_tem_marcador_proprio(self):
         # LATAM Pass não está no seats.aero: "sem estoque" afirmaria o que ninguém conferiu
-        viol = audit.auditar(self.bom.replace("390k milhas + R$ 350 · 2 programas (Azul, Smiles)",
+        viol = audit.auditar(self.bom.replace("390k milhas + R$ 350 · 2 voos",
                                               "sem dado: programa fora do seats.aero"))
         self.assertEqual(viol, [])
 
@@ -766,9 +864,52 @@ class TestAudit(unittest.TestCase):
             self.assertIn("sem dado: programa fora do seats.aero", linha)
             self.assertNotIn("sem estoque no cache", linha)
 
+    def test_celula_em_pontos_ou_avios_ok(self):
+        for piso in ("96k pontos + taxa desconhecida · 3 voos", "20 mil Avios + taxa desconhecida · 3 voos"):
+            with self.subTest(piso=piso):
+                self.assertEqual(audit.auditar(self.bom.replace("128k milhas + R$ 380 · 3 voos", piso)), [])
+
+    def test_exemplo_tem_uma_linha_por_programa(self):
+        self.assertNotIn("2 programas", self.bom)
+        self.assertIn("milhas × econômica (Smiles)", self.bom)
+
+    RECORTE = ("## AVISOS\n\n>> recorte: só a data mais barata\n\n## TABELA\n\n"
+               "| dinheiro × econômica | R$ 2.080 · 5 opções |\n\n## VEREDITO\n\nVoar dia 18.\n\n"
+               "## PRÓXIMOS PASSOS\n\nConferir o preço.\n")
+
+    def test_recorte_nao_cobra_a_matriz(self):
+        self.assertEqual(audit.auditar(self.RECORTE, recorte=True), [])
+
+    def test_sem_recorte_continua_cobrando_a_matriz(self):
+        self.assertTrue(any("célula ausente" in v for v in audit.auditar(self.RECORTE)))
+
+    def test_recorte_ainda_exige_avisos_e_veredito(self):
+        for secao in ("## AVISOS", "## VEREDITO"):
+            with self.subTest(secao=secao):
+                viol = audit.auditar(self.RECORTE.replace(secao, "## X"), recorte=True)
+                self.assertTrue(any("ausente" in v for v in viol))
+
+    def test_recorte_confere_a_celula_que_aparece(self):
+        viol = audit.auditar(self.RECORTE.replace("R$ 2.080 · 5 opções", "R$ 2.080"), recorte=True)
+        self.assertTrue(any("piso" in v for v in viol))
+
+    def test_recorte_ainda_barra_chave_de_api(self):
+        chave = "pro_" + "a" * 24
+        viol = audit.auditar(self.RECORTE.replace("Voar dia 18.", chave), recorte=True)
+        self.assertTrue(any("chave" in v for v in viol))
+
+    def test_linha_de_comando_com_recorte(self):
+        with tempfile.TemporaryDirectory() as td:
+            arq = Path(td) / "saida.md"
+            arq.write_text(self.RECORTE, encoding="utf-8")
+            with mock.patch.object(sys, "argv", ["audit.py", "--recorte", str(arq)]), \
+                    self.assertRaises(SystemExit) as fim, contextlib.redirect_stdout(io.StringIO()):
+                audit.main()
+        self.assertEqual(fim.exception.code, 0)
+
     def test_celula_sem_login_ok(self):
         viol = audit.auditar(
-            self.bom.replace("390k milhas + R$ 350 · 2 programas (Azul, Smiles)", "sem dado: seats.aero sem login"))
+            self.bom.replace("390k milhas + R$ 350 · 2 voos", "sem dado: seats.aero sem login"))
         self.assertEqual(viol, [])
 
     def test_veredito_depois_da_tabela(self):
