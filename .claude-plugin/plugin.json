@@ -1,0 +1,10 @@
+{
+  "name": "viagem-br",
+  "displayName": "Viagem BR",
+  "version": "1.6.0",
+  "description": "Pesquisa de voos e milhas para quem viaja a partir do Brasil: preço em dinheiro, preço em milhas e a conta do milheiro, em reais.",
+  "author": { "name": "Viagem BR" },
+  "homepage": "https://github.com/lucasalencarnutri/viagem-br",
+  "repository": "https://github.com/lucasalencarnutri/viagem-br",
+  "keywords": ["voos", "milhas", "passagens", "viagem", "brasil"]
+}

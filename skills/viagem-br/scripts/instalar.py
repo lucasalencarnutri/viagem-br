@@ -10,8 +10,13 @@ O que ele faz, nesta ordem:
   1. confere Node 22.12 ou mais novo, npm, Git e Claude Code. Faltou algum, para e diz o
      que instalar;
   2. baixa o servidor do Google Flights em ~/mcp/google-flights-mcp, no commit fixado, e compila;
-  3. liga google-flights e seats-aero no Claude Code (claude mcp add --scope user);
+  3. liga google-flights e seats-aero no Claude Code (claude mcp add --scope user). Com a
+     Viagem BR instalada como plugin, o plugin já liga o seats-aero, e aqui entra só o
+     google-flights;
   4. chama cada servidor uma vez e diz o que respondeu.
+
+Funciona de qualquer pasta: a do plugin ou ~/.claude/skills/viagem-br, pra quem instalou
+pelo arquivo .skill.
 
 O que ele nunca faz: instalar o Node, pedir senha de administrador, apagar pasta, fazer o
 login do seats.aero ou mexer num servidor que você já tinha ligado com o mesmo nome.
@@ -38,6 +43,10 @@ URL_SEATS = "https://seats.aero/mcp"
 OPCIONAIS = {"kiwi": "https://mcp.kiwi.com", "skiplagged": "https://mcp.skiplagged.com/mcp",
              "trivago": "https://mcp.trivago.com/mcp"}
 PASTA_GF = Path.home() / "mcp" / "google-flights-mcp"
+# Instalada como plugin do Claude Code, é o plugin que liga estes servidores (.mcp.json na
+# raiz dele). O google-flights fica de fora: precisa ser compilado no computador da pessoa.
+PLUGIN = "viagem-br"
+SERVIDORES_DO_PLUGIN = ("seats-aero",)
 COMO_INSTALAR = {
     "node": "Node 22.12 ou mais novo: baixe a versão LTS em nodejs.org e instale.",
     "npm": "npm: vem junto com o Node (nodejs.org).",
@@ -72,6 +81,11 @@ def _sem_git(url: str) -> str:
     return url[:-len(".git")] if url.endswith(".git") else url
 
 
+def nome_no_plugin(nome: str) -> str:
+    """Nome com que o Claude Code mostra um servidor que vem do plugin."""
+    return f"plugin:{PLUGIN}:{nome}"
+
+
 class Instalador:
     def __init__(self, rodar=None, achar=None, chamar=None, pasta_gf=None, dizer=print):
         self.rodar = rodar or _rodar
@@ -79,6 +93,7 @@ class Instalador:
         self.chamar = chamar or ponte_mcp.chamar
         self.pasta_gf = Path(pasta_gf or PASTA_GF)
         self.dizer = dizer
+        self.nome_do_seats = "seats-aero"  # nome que vale no login; conferir() troca se vier do plugin
 
     # ---- instalar ----
 
@@ -102,9 +117,11 @@ class Instalador:
         codigo = self.conferir()
         if codigo == 0:
             self.dizer("\nPróximos passos:\n"
-                       "  - Tem assinatura Pro do seats.aero? Faça o login, que abre no seu navegador:\n"
-                       "      claude mcp login seats-aero\n"
+                       "  - Tem assinatura Pro do seats.aero? Faça o login no Terminal, que abre no seu navegador:\n"
+                       f"      claude mcp login {self.nome_do_seats}\n"
                        "    Sem login a skill funciona, só com os próximos 60 dias.\n"
+                       "  - O Claude Code estava aberto? Feche e abra de novo: ele só enxerga servidor\n"
+                       "    novo quando abre.\n"
                        "  - Pra usar: digite claude no Terminal e peça, por exemplo,\n"
                        "    \"pesquisa voo de São Paulo pra Lisboa em fevereiro, econômica, 2 adultos\".")
         return codigo
@@ -164,14 +181,29 @@ class Instalador:
                         "repetir, siga o passo a passo manual do README.md.")
         self.dizer("  Pronto.")
 
-    def _ligar(self, nome: str, argumentos: list) -> None:
+    def _ligado(self, nome: str):
+        """(nome que vale no Claude Code, o que ele respondeu), ou (None, "") se não está ligado.
+
+        Servidor que a pessoa ligou vem antes: quando ela e o plugin apontam pro mesmo endereço,
+        o Claude Code usa o dela e esconde o do plugin (visto na versão 2.1.309).
+        """
         claude = self.achar("claude")
-        codigo, _ = self.rodar([claude, "mcp", "get", nome])
-        if codigo == 0:
+        nomes = [nome] + ([nome_no_plugin(nome)] if nome in SERVIDORES_DO_PLUGIN else [])
+        for candidato in nomes:
+            codigo, saida = self.rodar([claude, "mcp", "get", candidato])
+            if codigo == 0:
+                return candidato, saida
+        return None, ""
+
+    def _ligar(self, nome: str, argumentos: list) -> None:
+        ligado, _ = self._ligado(nome)
+        if ligado == nome:
             self.dizer(f"  {nome}: já estava ligado no Claude Code, não mexi.")
-            return
-        self._exigir([claude, "mcp", "add", *argumentos], f"Ligar o {nome} no Claude Code")
-        self.dizer(f"  {nome}: ligado.")
+        elif ligado:  # ligar de novo passaria por cima do plugin e do login feito nele
+            self.dizer(f"  {nome}: o plugin da Viagem BR já liga, não liguei de novo.")
+        else:
+            self._exigir([self.achar("claude"), "mcp", "add", *argumentos], f"Ligar o {nome} no Claude Code")
+            self.dizer(f"  {nome}: ligado.")
 
     # ---- conferir ----
 
@@ -203,20 +235,23 @@ class Instalador:
                 tudo_certo = False
                 self.dizer(f"  ✘ {nome} no Claude Code: não achei o Claude Code. {COMO_INSTALAR['claude']}")
                 continue
-            codigo, saida = self.rodar([claude, "mcp", "get", nome])
-            if codigo != 0:
+            ligado, saida = self._ligado(nome)
+            if not ligado:
                 tudo_certo = False
                 self.dizer(f"  ✘ {nome} no Claude Code: não está ligado. {RODE_O_INSTALADOR}")
                 continue
+            if nome == "seats-aero":
+                self.nome_do_seats = ligado
+            como = "ligado" if ligado == nome else "ligado pelo plugin"
             estado = re.search(r"Status:\s*(.+)", saida)
             estado = estado.group(1).strip() if estado else "sem estado informado"
             if "Failed" in estado or "✘" in estado:
                 tudo_certo = False
-                self.dizer(f"  ✘ {nome} no Claude Code: ligado, mas sem conexão ({estado}).")
+                self.dizer(f"  ✘ {nome} no Claude Code: {como}, mas sem conexão ({estado}).")
             elif "Connected" in estado:
-                self.dizer(f"  ✔ {nome} no Claude Code: ligado e conectado.")
+                self.dizer(f"  ✔ {nome} no Claude Code: {como} e conectado.")
             else:
-                self.dizer(f"  ! {nome} no Claude Code: ligado, estado \"{estado}\". Confira com `claude mcp list`.")
+                self.dizer(f"  ! {nome} no Claude Code: {como}, estado \"{estado}\". Confira com `claude mcp list`.")
         self.dizer("\nTudo certo." if tudo_certo else "\nFalta resolver o que está marcado com ✘.")
         return 0 if tudo_certo else 1
 

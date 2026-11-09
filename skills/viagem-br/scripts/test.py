@@ -27,6 +27,12 @@ from milheiro import (ECOS, FALTA_PRECO, FALTA_REGUA, Regua, comparar, estimar, 
 PASTA = Path(__file__).resolve().parent.parent
 EXEMPLO = PASTA / "exemplo" / "pesquisa-exemplo.md"
 
+# Dentro do plugin, esta pasta é <raiz do plugin>/skills/viagem-br. Instalada pelo arquivo
+# .skill, não há plugin em volta, e os testes que olham os arquivos do plugin são pulados.
+RAIZ_DO_PLUGIN = PASTA.parent.parent
+MANIFESTO_DO_PLUGIN = RAIZ_DO_PLUGIN / ".claude-plugin" / "plugin.json"
+TEM_PLUGIN = PASTA.parent.name == "skills" and MANIFESTO_DO_PLUGIN.exists()
+
 # Régua inventada, só pra exercitar a comparação nos testes.
 HOJE = date(2026, 11, 8)
 REGUA_TESTE = Regua({"azul": 20.0, "smiles": 25.0, "latam": 30.0, "avios": 40.0, "miles_go": 42.0,
@@ -841,10 +847,134 @@ class TestDocumentacao(unittest.TestCase):
     def test_regua_explica_taxa_desconhecida(self):
         self.assertIn("`--taxas desconhecida`", self.ler("references/regua-milheiro.md"))
 
+    def test_readme_ensina_os_dois_jeitos_de_instalar(self):
+        readme = self.ler("README.md")
+        # pelo plugin: dois comandos dentro do Claude Code
+        self.assertRegex(readme, r"(?m)^/plugin marketplace add [\w.-]+/viagem-br$")
+        self.assertRegex(readme, r"(?m)^/plugin install viagem-br@viagem-br$")
+        self.assertIn("roda o instalador da Viagem BR", readme)
+        # pelo arquivo: continua como era
+        self.assertIn("unzip -o ~/Downloads/viagem-br.skill -d ~/.claude/skills", readme)
+        self.assertIn("python3 ~/.claude/skills/viagem-br/scripts/instalar.py", readme)
+        # e cada jeito tem a sua atualização
+        self.assertIn("claude plugin update viagem-br@viagem-br", readme)
+
+    def test_readme_diz_como_chamar_a_skill_em_cada_jeito(self):
+        readme = self.ler("README.md")
+        self.assertIn("`/viagem-br:viagem-br`", readme)  # pelo plugin, o nome leva o do plugin na frente
+        self.assertIn("`/viagem-br`", readme)
+
+    def test_login_do_seats_aero_tem_os_dois_nomes(self):
+        pelo_plugin = f"claude mcp login {instalar.nome_no_plugin('seats-aero')}"
+        for nome in ("README.md", "references/seats-aero.md", "references/armadilhas.md"):
+            with self.subTest(arquivo=nome):
+                self.assertIn(pelo_plugin, self.ler(nome))
+                self.assertIn("claude mcp login seats-aero", self.ler(nome))
+
+    def test_skill_reconhece_a_ferramenta_que_vem_do_plugin(self):
+        self.assertIn("`mcp__plugin_viagem-br_seats-aero__get_flights`", self.ler("SKILL.md"))
+
+    def test_skill_roda_o_instalador_a_pedido_e_sabe_do_plugin(self):
+        skill = self.ler("SKILL.md")
+        descricao = re.search(r"^description: (.+)$", skill, re.MULTILINE).group(1)
+        self.assertIn("instalar, conferir ou atualizar a Viagem BR", descricao)
+        requisito = skill.split("## Pré-requisito")[1].split("\n## ")[0]
+        for trecho in ("tempo limite de 10 minutos", "Pelo plugin, o `seats-aero` já vem ligado",
+                       "fecha e abre de novo"):
+            with self.subTest(trecho=trecho):
+                self.assertIn(trecho, requisito)
+
+    def test_pasta_da_skill_nao_leva_arquivo_de_plugin(self):
+        # com .claude-plugin ou .mcp.json aqui dentro, o arquivo .skill descompactado em
+        # ~/.claude/skills viraria plugin por conta própria e ligaria o seats-aero sem o instalador
+        for nome in (".claude-plugin", ".mcp.json"):
+            with self.subTest(nome=nome):
+                self.assertFalse((PASTA / nome).exists())
+
+    def test_mudancas_contam_do_plugin_na_versao_em_que_ele_entrou(self):
+        versoes = {bloco.split(" ")[0]: bloco for bloco in self.ler("MUDANCAS.md").split("\n## ")[1:]}
+        self.assertIn("plugin", versoes["1.6.0"])
+        self.assertIn("viagem-br.skill", versoes["1.6.0"])  # e diz que o arquivo continua valendo
+
     def test_sem_travessao_nos_textos(self):
         for nome in [*self.ARQUIVOS, "exemplo/pesquisa-exemplo.md"]:
             with self.subTest(arquivo=nome):
                 self.assertNotIn(chr(0x2014), self.ler(nome))
+
+
+@unittest.skipUnless(TEM_PLUGIN, "instalada pelo arquivo .skill: não há plugin em volta desta pasta")
+class TestPlugin(unittest.TestCase):
+    """Os arquivos que fazem do repositório um plugin do Claude Code e o catálogo dele mesmo."""
+
+    @staticmethod
+    def json_de(*partes):
+        return json.loads(RAIZ_DO_PLUGIN.joinpath(*partes).read_text(encoding="utf-8"))
+
+    def setUp(self):
+        self.manifesto = self.json_de(".claude-plugin", "plugin.json")
+        self.readme_da_raiz = (RAIZ_DO_PLUGIN / "README.md").read_text(encoding="utf-8")
+
+    def test_versao_do_plugin_e_a_do_topo_das_mudancas(self):
+        # o Claude Code só entrega atualização do plugin quando a versão do plugin.json muda
+        topo = re.search(r"^## (\d+\.\d+\.\d+) \(", (PASTA / "MUDANCAS.md").read_text(encoding="utf-8"),
+                         re.MULTILINE)
+        self.assertEqual(self.manifesto["version"], topo.group(1))
+
+    def test_nome_do_plugin_e_o_da_skill_e_o_do_instalador(self):
+        self.assertEqual(self.manifesto["name"], "viagem-br")
+        self.assertEqual(self.manifesto["name"], PASTA.name)
+        self.assertEqual(self.manifesto["name"], instalar.PLUGIN)
+
+    def test_catalogo_tem_um_plugin_so_apontando_pra_raiz(self):
+        catalogo = self.json_de(".claude-plugin", "marketplace.json")
+        self.assertEqual(catalogo["name"], "viagem-br")  # é o que vem depois do @ no comando de instalar
+        self.assertTrue(catalogo["owner"]["name"])
+        # sem versão aqui: a do plugin.json é a que vale, e duas versões brigam
+        self.assertEqual(catalogo["plugins"], [{"name": self.manifesto["name"], "source": "./"}])
+
+    def test_plugin_liga_so_o_seats_aero(self):
+        # o google-flights é compilado no computador da pessoa: fica com o instalador
+        servidores = self.json_de(".mcp.json")["mcpServers"]
+        self.assertEqual(tuple(servidores), instalar.SERVIDORES_DO_PLUGIN)
+        self.assertEqual(servidores["seats-aero"], {"type": "http", "url": instalar.URL_SEATS})
+
+    def test_skill_fica_onde_o_plugin_procura(self):
+        self.assertEqual(PASTA, RAIZ_DO_PLUGIN / "skills" / self.manifesto["name"])
+        self.assertNotIn("skills", self.manifesto)  # caminho padrão, sem desvio no manifesto
+        self.assertFalse((RAIZ_DO_PLUGIN / "SKILL.md").exists())
+
+    def test_readme_da_raiz_tem_os_dois_comandos(self):
+        self.assertRegex(self.readme_da_raiz, r"(?m)^/plugin marketplace add [\w.-]+/viagem-br$")
+        self.assertRegex(self.readme_da_raiz, r"(?m)^/plugin install viagem-br@viagem-br$")
+        self.assertIn("roda o instalador da Viagem BR", self.readme_da_raiz)
+
+    def test_endereco_do_repositorio_e_um_so(self):
+        guia = (PASTA / "README.md").read_text(encoding="utf-8")
+        enderecos = set(re.findall(r"plugin marketplace add ([\w.-]+/[\w.-]+)", self.readme_da_raiz + guia))
+        self.assertEqual(len(enderecos), 1)
+        endereco = enderecos.pop()
+        for campo in ("repository", "homepage"):
+            with self.subTest(campo=campo):
+                self.assertEqual(self.manifesto[campo], f"https://github.com/{endereco}")
+
+    def test_readme_da_raiz_aponta_pra_arquivos_que_existem(self):
+        citados = re.findall(r"\]\((?!https?://)([^)#]+)", self.readme_da_raiz)
+        self.assertIn("skills/viagem-br/README.md", citados)
+        for citado in citados:
+            with self.subTest(citado=citado):
+                self.assertTrue((RAIZ_DO_PLUGIN / citado).exists())
+
+    def test_readme_da_raiz_fala_do_login_com_o_nome_do_plugin(self):
+        self.assertIn(f"claude mcp login {instalar.nome_no_plugin('seats-aero')}", self.readme_da_raiz)
+
+    def test_arquivos_do_plugin_sem_travessao_e_sem_chave(self):
+        arquivos = [RAIZ_DO_PLUGIN / "README.md", RAIZ_DO_PLUGIN / ".mcp.json",
+                    *sorted((RAIZ_DO_PLUGIN / ".claude-plugin").iterdir())]
+        for arq in arquivos:
+            texto = arq.read_text(encoding="utf-8")
+            with self.subTest(arquivo=arq.name):
+                self.assertNotIn(chr(0x2014), texto)
+                self.assertIsNone(audit._CHAVE_RE.search(texto))
 
 
 class TestAudit(unittest.TestCase):
@@ -1180,11 +1310,12 @@ class _ComputadorFalso:
     Nada aqui toca rede, Node, Git ou a configuração real do Claude Code."""
 
     def __init__(self, pasta, ferramentas=("node", "git", "npm", "claude"), node="v24.15.0",
-                 ligados=(), remoto=None, commit=None, build_ok=True, status="✓ Connected"):
+                 ligados=(), do_plugin=(), remoto=None, commit=None, build_ok=True, status="✓ Connected"):
         self.pasta = pasta
         self.ferramentas = set(ferramentas)
         self.node = node
-        self.ligados = list(ligados)
+        self.ligados = list(ligados)  # servidores ligados pela própria pessoa (claude mcp add)
+        self.do_plugin = set(do_plugin)  # servidores que o plugin instalado liga sozinho
         self.remoto = remoto or instalar.REPO_GF
         self.commit = commit  # commit em que a pasta já está, se ela existir
         self.build_ok = build_ok
@@ -1227,9 +1358,17 @@ class _ComputadorFalso:
             (self.pasta / "dist" / "index.js").write_text("// falso", encoding="utf-8")
             return 0, "Build success"
         if nome == "claude" and resto[:2] == ["mcp", "get"]:
-            if resto[2] in self.ligados:
-                return 0, f"{resto[2]}:\n  Scope: User config\n  Status: {self.status}\n"
-            return 1, f'No MCP server named "{resto[2]}".'
+            pedido, prefixo = resto[2], f"plugin:{instalar.PLUGIN}:"
+            if pedido in self.ligados:
+                return 0, f"{pedido}:\n  Scope: User config\n  Status: {self.status}\n"
+            # Visto no Claude Code 2.1.309: o servidor do plugin atende por plugin:<plugin>:<nome>
+            # e some da lista quando a pessoa já ligou o mesmo endereço por conta própria.
+            if pedido.startswith(prefixo):
+                base = pedido[len(prefixo):]
+                if base in self.do_plugin and base not in self.ligados:
+                    return 0, (f"{pedido}:\n  Scope: Dynamic config (from command line)\n"
+                               f"  Status: {self.status}\n  Type: http\n")
+            return 1, f'No MCP server named "{pedido}".'
         if nome == "claude" and resto[:2] == ["mcp", "add"]:
             self.ligados.append("google-flights" if "google-flights" in resto else
                                 next(n for n in ("seats-aero", *instalar.OPCIONAIS) if n in resto))
@@ -1354,8 +1493,76 @@ class TestInstalador(unittest.TestCase):
         self.assertEqual(pc.feitas("mcp", "add"), [])
         self.assertIn("não mexi", self.texto())
 
+    # ---- instalada como plugin: o plugin já liga o seats-aero ----
+
+    def test_com_o_plugin_o_seats_aero_nao_e_ligado_de_novo(self):
+        pc = self.pc(do_plugin=("seats-aero",))
+        self.assertEqual(self.instalador(pc).instalar(), 0)
+        ligados_agora = pc.feitas("mcp", "add")
+        self.assertEqual(len(ligados_agora), 1)
+        self.assertIn("google-flights", ligados_agora[0])
+        self.assertEqual(pc.ligados, ["google-flights"])
+        self.assertIn("seats-aero: o plugin da Viagem BR já liga", self.texto())
+        self.assertIn("Tudo certo", self.texto())
+
+    def test_com_o_plugin_o_login_indicado_leva_o_nome_do_plugin(self):
+        pc = self.pc(do_plugin=("seats-aero",))
+        self.instalador(pc).instalar()
+        self.assertEqual(instalar.nome_no_plugin("seats-aero"), "plugin:viagem-br:seats-aero")
+        self.assertIn("claude mcp login plugin:viagem-br:seats-aero\n", self.texto())
+        self.assertNotIn("claude mcp login seats-aero\n", self.texto())
+
+    def test_pelo_arquivo_o_login_indicado_continua_o_de_sempre(self):
+        pc = self.pc()
+        self.instalador(pc).instalar()
+        self.assertIn("claude mcp login seats-aero\n", self.texto())
+        self.assertNotIn("plugin:", self.texto())
+
+    def test_servidor_que_a_pessoa_ligou_vale_por_cima_do_plugin(self):
+        # quem veio do arquivo .skill e depois instalou o plugin: o Claude Code usa o servidor
+        # que a pessoa ligou, e é nele que o login dela está
+        pc = self.pc(ligados=("seats-aero",), do_plugin=("seats-aero",))
+        self.assertEqual(self.instalador(pc).instalar(), 0)
+        self.assertEqual([c for c in pc.feitas("mcp", "add") if "seats-aero" in c], [])
+        self.assertIn("seats-aero: já estava ligado no Claude Code", self.texto())
+        self.assertIn("claude mcp login seats-aero\n", self.texto())
+        self.assertIn("seats-aero no Claude Code: ligado e conectado", self.texto())
+
+    def test_conferir_aceita_o_seats_aero_que_vem_do_plugin(self):
+        pc = self.pc(do_plugin=("seats-aero",))
+        self.instalador(pc).instalar()
+        pc.chamadas.clear()
+        self.saida.clear()
+        self.assertEqual(self.instalador(pc).conferir(), 0)
+        self.assertIn("seats-aero no Claude Code: ligado pelo plugin e conectado", self.texto())
+        self.assertIn("google-flights no Claude Code: ligado e conectado", self.texto())
+        self.assertEqual(pc.feitas("mcp", "add"), [])
+
+    def test_conferir_acusa_servidor_do_plugin_sem_conexao(self):
+        pc = self.pc(do_plugin=("seats-aero",), status="✘ Failed to connect")
+        self.instalador(pc).instalar()
+        self.saida.clear()
+        self.assertEqual(self.instalador(pc).conferir(), 1)
+        self.assertIn("seats-aero no Claude Code: ligado pelo plugin, mas sem conexão", self.texto())
+
+    def test_so_o_que_o_plugin_liga_e_procurado_pelo_nome_do_plugin(self):
+        # google-flights, Kiwi, Skiplagged e Trivago não vêm no plugin: cada pergunta ao
+        # Claude Code abre uma conexão, então não se pergunta à toa
+        self.assertEqual(instalar.SERVIDORES_DO_PLUGIN, ("seats-aero",))
+        pc = self.pc()
+        self.instalador(pc).instalar(opcionais=True)
+        perguntados = {c[-1] for c in pc.feitas("mcp", "get")}
+        self.assertEqual({n for n in perguntados if n.startswith("plugin:")}, {"plugin:viagem-br:seats-aero"})
+
+    def test_avisa_pra_fechar_e_abrir_o_claude_code(self):
+        # rodado pelo Claude no meio de uma conversa, o servidor novo só aparece na próxima abertura
+        pc = self.pc(do_plugin=("seats-aero",))
+        self.instalador(pc).instalar()
+        self.assertIn("Feche e abra de novo", self.texto())
+
     def test_nunca_faz_login_nem_apaga_nem_pede_administrador(self):
-        cenarios = (dict(), dict(node="v20.0.0"), dict(build_ok=False), dict(ligados=("google-flights",)))
+        cenarios = (dict(), dict(node="v20.0.0"), dict(build_ok=False), dict(ligados=("google-flights",)),
+                    dict(do_plugin=("seats-aero",)), dict(ligados=("seats-aero",), do_plugin=("seats-aero",)))
         for como in cenarios:
             pc = self.pc(**como)
             inst = self.instalador(pc)

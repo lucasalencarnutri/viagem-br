@@ -1,6 +1,6 @@
 ---
 name: viagem-br
-description: Pesquisa de voos e milhas para quem viaja a partir do Brasil, com os MCPs google-flights e seats-aero. Use quando a pessoa perguntar sobre rota, preço de passagem, emissão em milhas (Smiles, Azul, Avios, pontos Livelo ou Esfera), milheiro de uma emissão, "como tá GRU-NRT", melhor data para voar, comparação dinheiro × milhas, cabine, conexões ou monitoramento de tarifa, ou pedir pra preencher a régua do milheiro. Também busca hotel pelo Trivago, quando conectado. Não usar para montagem de roteiro de viagem ou lista de promoções de transferência do dia.
+description: Pesquisa de voos e milhas para quem viaja a partir do Brasil, com os MCPs google-flights e seats-aero. Use quando a pessoa perguntar sobre rota, preço de passagem, emissão em milhas (Smiles, Azul, Avios, pontos Livelo ou Esfera), milheiro de uma emissão, "como tá GRU-NRT", melhor data para voar, comparação dinheiro × milhas, cabine, conexões ou monitoramento de tarifa, ou pedir pra preencher a régua do milheiro ou pra instalar, conferir ou atualizar a Viagem BR. Também busca hotel pelo Trivago, quando conectado. Não usar para montagem de roteiro de viagem ou lista de promoções de transferência do dia.
 ---
 
 # Viagem BR: pesquisa de voos e milhas
@@ -25,10 +25,10 @@ Abertura: uma chamada leve por servidor (`lookup_airport` no google-flights; `ge
 
 Servidores `google-flights` e `seats-aero`, por um destes caminhos, nesta ordem:
 
-1. **MCP nativo da ferramenta** (Claude Code e outras que aceitam MCP). `claude mcp list` confere. O prefixo do nome das ferramentas muda de uma ferramenta pra outra (`mcp__google-flights__search_flights`, `google-flights_search_flights`): vale o nome base (`search_flights`, `get_flights`). Kiwi e Skiplagged são opcionais (Passo 4).
+1. **MCP nativo da ferramenta** (Claude Code e outras que aceitam MCP). `claude mcp list` confere. O prefixo do nome das ferramentas muda de uma ferramenta pra outra (`mcp__google-flights__search_flights`, `google-flights_search_flights`), e com a Viagem BR instalada como plugin do Claude Code o `seats-aero` leva o nome do plugin (`mcp__plugin_viagem-br_seats-aero__get_flights`): vale o nome base (`search_flights`, `get_flights`). Kiwi e Skiplagged são opcionais (Passo 4).
 2. **Ponte de terminal**, em qualquer ferramenta que rode comandos: `python3 scripts/ponte_mcp.py <servidor> <ferramenta> '<argumentos em JSON>'` chama uma ferramenta e imprime o resultado; `--lista` no lugar da ferramenta mostra as ferramentas e os parâmetros. Pela ponte, o `seats-aero` é sempre anônimo (armadilha 24). Ferramenta que bloqueia rede no terminal precisa liberar a rede pra ponte ou usar o caminho 1.
 
-Nenhum dos dois respondeu: parar, sem pesquisar, e rodar `python3 scripts/instalar.py --conferir`, que chama cada servidor e diz o que falta. Instalar ou reinstalar (`python3 scripts/instalar.py`) só com o ok da pessoa; o passo a passo está no `README.md`.
+Um servidor não respondeu por nenhum dos dois caminhos: parar, sem pesquisar, e rodar `python3 scripts/instalar.py --conferir`, que chama cada servidor e diz o que falta. Instalar ou reinstalar (`python3 scripts/instalar.py`) só com o ok da pessoa, e o pedido dela pra instalar já é o ok; o passo a passo está no `README.md`. O instalador leva de 1 a 3 minutos: rode com tempo limite de 10 minutos e mostre o que ele respondeu. Pelo plugin, o `seats-aero` já vem ligado e o instalador cuida só do `google-flights`. O Claude Code só enxerga servidor novo quando a pessoa fecha e abre de novo: avise, e até lá siga pela ponte.
 
 **seats.aero.** É o MCP oficial (`https://seats.aero/mcp`), com a conta de cada pessoa. Sem login ele só enxerga os próximos 60 dias. Por padrão ele esconde emissão de preço dinâmico muito alto, e sem login não dá pra desligar (armadilha 41). Campos e limites: `references/seats-aero.md`. A skill não tem caminho por chave de API: o acesso é o login da conta da própria pessoa. Chave de API em arquivo ou na resposta é violação de segurança: o audit rejeita o padrão `pro_...` em qualquer linha.
 

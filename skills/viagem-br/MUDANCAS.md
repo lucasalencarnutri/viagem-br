@@ -2,6 +2,14 @@
 
 A versão mais nova fica no topo. A versão disponível pra baixar aparece no começo do guia de instalação.
 
+## 1.6.0 (09/11/2026)
+
+- Instalação como plugin do Claude Code, com dois comandos digitados dentro dele. O passo a passo está no README.
+- Pelo plugin, o seats.aero já vem ligado. O Google Flights continua com o instalador, que o Claude roda quando você pede.
+- O instalador reconhece o seats.aero ligado pelo plugin e não liga de novo. O login indicado no fim leva o nome certo pra cada jeito de instalar.
+- Atualizar pelo plugin é um comando: `claude plugin update viagem-br@viagem-br`.
+- Instalar pelo arquivo `viagem-br.skill` continua funcionando do mesmo jeito.
+
 ## 1.5.0 (09/11/2026)
 
 - Ida e volta passa a ser comparada com dois só-ida, e a conta do milheiro é feita em cada sentido. O veredito pode sair misto: um sentido em milhas, o outro em dinheiro.

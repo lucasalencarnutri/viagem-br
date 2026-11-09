@@ -1,0 +1,8 @@
+{
+  "name": "viagem-br",
+  "owner": { "name": "Viagem BR" },
+  "description": "Viagem BR: pesquisa de voos e milhas para quem viaja a partir do Brasil.",
+  "plugins": [
+    { "name": "viagem-br", "source": "./" }
+  ]
+}

@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "seats-aero": {
+      "type": "http",
+      "url": "https://seats.aero/mcp"
+    }
+  }
+}
