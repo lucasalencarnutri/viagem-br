@@ -168,6 +168,42 @@ class TestLeituraDaRegua(unittest.TestCase):
     def test_data_das_medias(self):
         self.assertEqual(ler_regua().atualizada_em, date(2026, 11, 8))
 
+    def test_valor_com_media_entra_e_fica_marcado(self):
+        r = self.regua("| Smiles | 16 (média) |\n| Azul | R$ 20,50 |")
+        self.assertEqual(r.valores, {"smiles": 16.0, "azul": 20.5})
+        self.assertEqual(set(r.medias), {"smiles"})
+
+    def test_regua_de_fabrica_vem_toda_marcada_como_media(self):
+        r = ler_regua()
+        self.assertEqual(set(r.medias), set(r.valores))
+
+
+class TestMediaDeReferencia(unittest.TestCase):
+    # smiles ainda é média de fábrica; azul já é valor da pessoa
+    REGUA = Regua({"smiles": 16.0, "azul": 20.0, "avios": 56.0}, HOJE, frozenset({"smiles", "avios"}))
+
+    def test_media_nao_sai_como_sua_regua(self):
+        res = comparar(55.6, "smiles", self.REGUA, HOJE)
+        self.assertIn("acima da média de referência para smiles (R$ 16,00)", res)
+        self.assertIn("[MÉDIA DE REFERÊNCIA", res)
+        self.assertNotIn("sua régua", res)
+
+    def test_valor_proprio_segue_como_sua_regua(self):
+        res = comparar(25.0, "azul", self.REGUA, HOJE)
+        self.assertIn("acima do valor da sua régua para azul (R$ 20,00)", res)
+        self.assertNotIn("MÉDIA DE REFERÊNCIA", res)
+
+    def test_codigo_do_seats_aero_herda_a_marca(self):
+        self.assertIn("[MÉDIA DE REFERÊNCIA", comparar(78.0, "iberia", self.REGUA, HOJE))
+
+    def test_estimativa_com_media_avisa(self):
+        res = estimar(70000, "smiles", 380, {"smiles": 16.0}, {"smiles"})
+        self.assertIn("média de referência", res)
+        self.assertIn("R$ 1.500,00", res)
+
+    def test_estimativa_com_preco_proprio_nao_avisa(self):
+        self.assertNotIn("média de referência", estimar(70000, "smiles", 380, {"smiles": 16.0}))
+
 
 class TestEstimativaEmReais(unittest.TestCase):
     # preços inventados, só pra exercitar a conta
@@ -325,6 +361,11 @@ class TestCliMilheiro(unittest.TestCase):
         self.assertIn("acima do valor da sua régua para Smiles (R$ 25,00)", saida)
         self.assertNotIn("[RECONFIRMAR", saida)
 
+    def test_regua_de_fabrica_sai_marcada_como_media(self):
+        saida = self.rodar("--cash", "4272", "--taxas", "380", "--milhas", "70000", "--programa", "smiles")
+        self.assertIn("[MÉDIA DE REFERÊNCIA", saida)
+        self.assertNotIn("sua régua", saida)
+
 
 class TestCliEstimar(unittest.TestCase):
     def rodar(self, *args):
@@ -336,6 +377,10 @@ class TestCliEstimar(unittest.TestCase):
     def test_estimar_nao_exige_preco_em_dinheiro(self):
         saida = self.rodar("--estimar", "--milhas", "70.800", "--taxas", "245,36", "--programa", "lifemiles")
         self.assertIn(FALTA_PRECO, saida)
+
+    def test_estimar_com_tabela_de_fabrica_avisa_que_e_media(self):
+        saida = self.rodar("--estimar", "--milhas", "70000", "--taxas", "380", "--programa", "smiles")
+        self.assertIn("média de referência", saida)
 
     def test_sem_estimar_exige_dinheiro_e_taxas(self):
         with self.assertRaises(SystemExit), contextlib.redirect_stderr(io.StringIO()):
@@ -420,6 +465,20 @@ class TestDocumentacao(unittest.TestCase):
                        "claude mcp login seats-aero", "plano Pro", "no dia em que for assinar"):
             with self.subTest(trecho=trecho):
                 self.assertIn(trecho, readme)
+
+    def test_jetblue_consta_como_programa_do_mcp(self):
+        # conferido em 2026-11-09: `jetblue` está em `programs` e responde sem login
+        for nome in ("SKILL.md", "references/armadilhas.md"):
+            with self.subTest(arquivo=nome):
+                self.assertNotIn("JetBlue não existe no MCP", self.ler(nome))
+        seats = self.ler("references/seats-aero.md")
+        self.assertIn("34 em `programs`", seats)
+        self.assertIn("`jetblue`", seats)
+
+    def test_textos_ensinam_a_tirar_a_marca_de_media(self):
+        for nome in ("SKILL.md", "README.md", "references/regua-milheiro.md"):
+            with self.subTest(arquivo=nome):
+                self.assertIn("`(média)`", self.ler(nome))
 
     def test_sem_travessao_nos_textos(self):
         for nome in [*self.ARQUIVOS, "exemplo/pesquisa-exemplo.md"]:

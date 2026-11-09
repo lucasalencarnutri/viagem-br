@@ -39,20 +39,22 @@ Não quer editar o arquivo? Diga pro Claude "preenche minha régua" e informe os
 
 R$ por 1.000 milhas, valor máximo por programa. Aceita `20`, `20,50` ou `R$ 20,50`. Já vem com médias de referência de novembro de 2026; troque pelos seus. SUMA são 10 euros, a R$ 6,1317 o euro (06/11/2026).
 
+Valor com `(média)` ao lado é média de referência, e o resultado sai marcado `[MÉDIA DE REFERÊNCIA]`. Ao trocar pelo seu, apague o `(média)` daquela linha.
+
 <!-- regua:inicio -->
 | Programa | Valor máximo (R$ por 1.000) |
 |---|---|
-| Azul | 14 |
-| Smiles | 16 |
-| LATAM Pass | 25 |
-| Avios | 56 |
-| Miles & Go | 35 |
+| Azul | 14 (média) |
+| Smiles | 16 (média) |
+| LATAM Pass | 25 (média) |
+| Avios | 56 (média) |
+| Miles & Go | 35 (média) |
 | Lifemiles | |
-| SUMA | 61,32 |
-| Aeroplan | 70 |
-| Flying Blue | 75 |
-| Aegean | 68 |
-| JAL | 84 |
+| SUMA | 61,32 (média) |
+| Aeroplan | 70 (média) |
+| Flying Blue | 75 (média) |
+| Aegean | 68 (média) |
+| JAL | 84 (média) |
 | Connectmiles | |
 <!-- regua:fim -->
 
@@ -62,25 +64,25 @@ Passados 90 dias dessa data, ou sem data nenhuma, o resultado sai com `[RECONFIR
 
 ## Seu preço de referência (opcional)
 
-R$ por 1.000 milhas: o que você costuma pagar em cada programa. Serve só pra dizer "em milhas fica mais ou menos isso". O veredito continua na régua acima. Programa cobrado em outra moeda: converta pra reais antes de preencher.
+R$ por 1.000 milhas: o que você costuma pagar em cada programa. Serve só pra dizer "em milhas fica mais ou menos isso". O veredito continua na régua acima. Programa cobrado em outra moeda: converta pra reais antes de preencher. Aqui também, `(média)` marca o que veio no pacote: apague ao trocar pelo seu.
 
 <!-- preco:inicio -->
 | Programa | Preço de referência (R$ por 1.000) |
 |---|---|
-| LATAM Pass | 25 |
-| Smiles | 16 |
-| Azul | 14 |
-| Avios | 56 |
-| Miles & Go | 35 |
-| Aegean | 68 |
-| Livelo | 30 |
-| Esfera | 35 |
-| Flying Blue | 75 |
-| Aeroplan | 70 |
-| JAL | 84 |
-| AAdvantage | 100 |
-| Skywards | 100 |
-| SUMA | 61,32 |
+| LATAM Pass | 25 (média) |
+| Smiles | 16 (média) |
+| Azul | 14 (média) |
+| Avios | 56 (média) |
+| Miles & Go | 35 (média) |
+| Aegean | 68 (média) |
+| Livelo | 30 (média) |
+| Esfera | 35 (média) |
+| Flying Blue | 75 (média) |
+| Aeroplan | 70 (média) |
+| JAL | 84 (média) |
+| AAdvantage | 100 (média) |
+| Skywards | 100 (média) |
+| SUMA | 61,32 (média) |
 <!-- preco:fim -->
 
 Comando: `python3 scripts/milheiro.py --estimar --milhas N --taxas T --programa P`. Programa sem valor sai `[FALTA: seu preço de referência]`.

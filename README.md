@@ -146,7 +146,7 @@ Deu certo se terminar com `OK`.
 
 A tabela já vem com médias de referência de novembro de 2026, então a skill funciona de cara. Troque pelos seus valores, porque esse número depende de como você compra milhas. Programa sem valor sai `[FALTA: valor da sua régua]` no lugar da comparação.
 
-Pra ajustar, diga pro Claude "preenche minha régua do milheiro" e informe os valores. Ou abra o arquivo `~/.claude/skills/viagem-br/references/regua-milheiro.md` num editor de texto e complete a tabela "Sua régua" e a data.
+Pra ajustar, diga pro Claude "preenche minha régua do milheiro" e informe os valores. Ou abra o arquivo `~/.claude/skills/viagem-br/references/regua-milheiro.md` num editor de texto e complete a tabela "Sua régua" e a data. Ao trocar um valor, apague o `(média)` ao lado dele: enquanto estiver lá, o resultado sai marcado como média de referência.
 
 A mesma página tem uma segunda tabela, também já preenchida com médias: "Seu preço de referência", com o que se costuma pagar por 1.000 milhas. Com ela, a skill diz quanto a emissão fica em reais, mais ou menos. Sem ela, escreve `[FALTA: seu preço de referência]`. O veredito não muda.
 

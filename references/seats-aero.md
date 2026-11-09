@@ -1,6 +1,6 @@
 # seats.aero: como o servidor funciona
 
-O servidor é o MCP oficial, `https://seats.aero/mcp`, e cada pessoa usa a própria conta. Medido em 2026-11-01; login, recorte por banco e `max_fees` revistos em 2026-11-07; limites de conta e lista de programas conferidos em 2026-11-08. Mudou o servidor: re-testar e atualizar com data.
+O servidor é o MCP oficial, `https://seats.aero/mcp`, e cada pessoa usa a própria conta. Medido em 2026-11-01; login, recorte por banco e `max_fees` revistos em 2026-11-07; limites de conta conferidos em 2026-11-08; lista de programas, em 2026-11-09. Mudou o servidor: re-testar e atualizar com data.
 
 | Item | Como funciona |
 |---|---|
@@ -8,7 +8,7 @@ O servidor é o MCP oficial, `https://seats.aero/mcp`, e cada pessoa usa a próp
 | Com login | Só com assinatura Pro do seats.aero: calendário inteiro, busca ao vivo, alertas e mais ferramentas. Login: `claude mcp login seats-aero` (a pessoa faz no navegador dela) |
 | Busca | `get_flights` com `origins` e `destinations` em lista, `cabin` com um valor só (uma chamada por cabine), `start_date` e `end_date` (até 60 dias por chamada), `max_results` (teto 50), `programs`, `operating_carriers` (companhia que voa, ex.: `G3`, `AD`), `max_stops` (padrão 0 = só direto, armadilha 15), `min_seats` (nem todo programa aceita), `max_fees` em centavos de dólar (armadilha 26). A resposta traz `status` (`results`, `filtered` ou `no_availability`), `truncated_by` (quantos resultados ficaram fora do corte) e `search_url` (a mesma busca no site) |
 | Frescor | `minutes_old` (7 dias ≈ 10 mil minutos) |
-| Programas | 33 em `programs`, com `smiles`, `azul`, `iberia`, `british`, `qatar`, `lifemiles`, `livelo`, `jal` e `asiamiles`. LATAM Pass fora |
+| Programas | 34 em `programs` (2026-11-09), com `smiles`, `azul`, `iberia`, `british`, `qatar`, `lifemiles`, `livelo`, `jal`, `asiamiles` e `jetblue`. LATAM Pass fora |
 | Detalhe do voo | `get_flight_details` (por `flight_ref`) |
 | Busca ao vivo | `live_search`, só com login, com cota da conta e um programa por chamada (tem `smiles`, não tem `azul`). Gasta a cota: usar só perto da emissão ou quando o cache estiver velho |
 | Preço de clube | Opções salvas na conta (`get_pricing_options`), só com login; não conferido se o Clube Smiles está lá |

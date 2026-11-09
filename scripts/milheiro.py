@@ -5,6 +5,8 @@ A régua mora na tabela "Sua régua" de references/regua-milheiro.md: R$ por 1.0
 valor máximo por programa. Este script lê a tabela a cada execução e não guarda valor nenhum.
 
   programa com valor na tabela     compara contra esse valor.
+  valor seguido de "(média)"       é a média de referência que veio no pacote: compara e
+                                   marca [MÉDIA DE REFERÊNCIA]. Trocou pelo seu, apague o "(média)".
   programa sem valor ou fora dela  calcula o milheiro e marca [FALTA: valor da sua régua].
 
 Trava de atualidade: passados 90 dias da data informada na régua, ou sem data nenhuma,
@@ -38,10 +40,14 @@ VALIDADE_DIAS = 90
 
 _TABELA_RE = r"<!-- {nome}:inicio -->(.*?)<!-- {nome}:fim -->"
 _DATA_RE = re.compile(r"^Última atualização da régua \(DD/MM/AAAA\):[ \t]*(\S*)", re.MULTILINE)
+_MEDIA_RE = re.compile(r"\(\s*m[eé]dia\s*\)", re.IGNORECASE)
+AVISO_MEDIA = ("[MÉDIA DE REFERÊNCIA: não é o seu custo; troque pelo seu valor em "
+               "references/regua-milheiro.md.]")
 
 # valores: chave do programa → R$ por 1.000 (só o que está preenchido)
 # atualizada_em: date ou None
-Regua = namedtuple("Regua", "valores atualizada_em")
+# medias: chaves cujo valor ainda é a média de referência que veio no pacote
+Regua = namedtuple("Regua", "valores atualizada_em medias", defaults=(frozenset(),))
 
 # nomes de exibição → chave da régua (mapa explícito, sem adivinhação:
 # normalizar "LATAM Pass"→latam regra por regra criaria falsos positivos)
@@ -119,9 +125,12 @@ def _data_br(txt: str):
         return None
 
 
-def _valores_da_tabela(texto: str, nome: str) -> dict:
-    """Lê uma tabela delimitada por comentários. Valor em branco, zero ou ilegível não entra."""
-    valores = {}
+def _ler_tabela(texto: str, nome: str):
+    """Lê uma tabela delimitada por comentários: (valores, medias).
+
+    Valor em branco, zero ou ilegível não entra. Valor seguido de "(média)" é a média
+    de referência que veio no pacote: entra nos valores e a chave vai pra `medias`."""
+    valores, medias = {}, set()
     bloco = re.search(_TABELA_RE.format(nome=nome), texto, re.DOTALL)
     for linha in (bloco.group(1) if bloco else "").splitlines():
         linha = linha.strip()
@@ -130,22 +139,27 @@ def _valores_da_tabela(texto: str, nome: str) -> dict:
         celulas = [c.strip() for c in linha.strip("|").split("|")]
         if len(celulas) < 2 or celulas[0].casefold() == "programa" or not celulas[0].strip("-: "):
             continue
-        if not celulas[1]:
+        bruto, marcas = _MEDIA_RE.subn("", celulas[1])
+        if not bruto.strip():
             continue
         try:
-            valor = numero_br(celulas[1])
+            valor = numero_br(bruto)
         except argparse.ArgumentTypeError:
             ECOS.append(f"não entendi o valor de {celulas[0]} na régua: {celulas[1]!r}")
             continue
         if valor > 0:
-            valores[chave_programa(celulas[0])] = valor
-    return valores
+            chave = chave_programa(celulas[0])
+            valores[chave] = valor
+            if marcas:
+                medias.add(chave)
+    return valores, frozenset(medias)
 
 
 def interpretar_regua(texto: str) -> Regua:
     """Lê a tabela "Sua régua" e a data da última atualização."""
     data = _DATA_RE.search(texto)
-    return Regua(_valores_da_tabela(texto, "regua"), _data_br(data.group(1)) if data else None)
+    valores, medias = _ler_tabela(texto, "regua")
+    return Regua(valores, _data_br(data.group(1)) if data else None, medias)
 
 
 def _texto_da_regua(caminho: Path = None) -> str:
@@ -163,16 +177,20 @@ def ler_regua(caminho: Path = None) -> Regua:
 
 def ler_precos(caminho: Path = None) -> dict:
     """Lê a tabela "Seu preço de referência"."""
-    return _valores_da_tabela(_texto_da_regua(caminho), "preco")
+    return _ler_tabela(_texto_da_regua(caminho), "preco")[0]
 
 
 def milheiro(preco_cash: float, taxas: float, milhas: int) -> float:
     return (preco_cash - taxas) / milhas * 1000
 
 
-def estimar(milhas: float, programa: str, taxas: float = None, precos: dict = None) -> str:
-    """Quanto a emissão fica em reais, mais ou menos, pelo preço que a pessoa preencheu."""
-    precos = ler_precos() if precos is None else precos
+def estimar(milhas: float, programa: str, taxas: float = None, precos: dict = None,
+            medias=None) -> str:
+    """Quanto a emissão fica em reais, mais ou menos, pelo preço da tabela.
+
+    `medias`: chaves cujo preço ainda é a média que veio no pacote."""
+    if precos is None:
+        precos, medias = _ler_tabela(_texto_da_regua(), "preco")
     nome = programa.strip()
     chave = chave_programa(programa)
     if chave not in precos:
@@ -180,8 +198,10 @@ def estimar(milhas: float, programa: str, taxas: float = None, precos: dict = No
                 "references/regua-milheiro.md.")
     preco = precos[chave]
     pontos = milhas / 1000 * preco
+    origem = ("estimativa pela média de referência, não pelo seu preço"
+              if chave in (medias or ()) else "estimativa")
     base = (f"{nome}: as milhas ficam mais ou menos R$ {reais_br(pontos)} "
-            f"(R$ {reais_br(preco)} o milheiro, estimativa)")
+            f"(R$ {reais_br(preco)} o milheiro, {origem})")
     if taxas is None:
         return base + " [FALTA: taxas]"
     return (base + f"; com R$ {reais_br(taxas)} de taxas, mais ou menos "
@@ -212,13 +232,16 @@ def comparar(milheiro_calc: float, programa: str, regua: Regua = None, hoje=None
                 "references/regua-milheiro.md.")
     valor = regua.valores[chave]
     dif = round(milheiro_calc - valor, 2)
-    if dif == 0:
-        pos = "igual ao"
+    pos = "igual" if dif == 0 else ("abaixo" if dif < 0 else "acima")
+    if chave in regua.medias:
+        ref = ("igual à" if dif == 0 else f"{pos} da") + " média de referência"
+        aviso = " " + AVISO_MEDIA
     else:
-        pos = "abaixo do" if dif < 0 else "acima do"
-    return (f"R$ {reais_br(milheiro_calc)}/milheiro: {pos} valor da sua régua para {nome} "
+        ref = ("igual ao" if dif == 0 else f"{pos} do") + " valor da sua régua"
+        aviso = ""
+    return (f"R$ {reais_br(milheiro_calc)}/milheiro: {ref} para {nome} "
             f"(R$ {reais_br(valor)}), diferença de R$ {reais_br(abs(dif))} por milheiro."
-            f"{_aviso_validade(regua, hoje)}")
+            f"{aviso}{_aviso_validade(regua, hoje)}")
 
 
 def main() -> None:
