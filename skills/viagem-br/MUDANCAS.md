@@ -2,6 +2,11 @@
 
 A versão mais nova fica no topo. A versão disponível pra baixar aparece no começo do guia de instalação.
 
+## 1.6.1 (10/11/2026)
+
+- Correção na conta de ida e volta. Quando o bilhete de ida e volta em dinheiro sai mais barato que dois só-ida, comparar cada sentido com o só-ida dele fazia a emissão parecer melhor do que é. A conta passa a usar o dinheiro que a emissão evita de verdade.
+- Quando o preço em milhas não aparece (escondido pelo seats.aero, rota que ele não acompanha ou programa que ele não cobre), a skill passa a dizer até quantos pontos por pessoa a emissão ainda compensa: só a ida, só a volta e a viagem inteira. Você compara com o que o site do programa pedir.
+
 ## 1.6.0 (09/11/2026)
 
 - Instalação como plugin do Claude Code, com dois comandos digitados dentro dele. O passo a passo está no README.

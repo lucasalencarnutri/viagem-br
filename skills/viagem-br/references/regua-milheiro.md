@@ -22,6 +22,25 @@ Compare o milheiro da emissão com o valor da sua régua para o programa que emi
 - **Veredito SEMPRE em termos de milheiro** (ex.: "milheiro de R$ 38 contra régua de R$ 30"), nunca como "economia de X%": percentual esconde o custo de repor as milhas.
 - **Bagagem desigual invalida a comparação:** preço listado é SEM bagagem; se a emissão inclui bagagem e o preço em dinheiro não, ajuste antes de dar o veredito (os dois lados com as mesmas regras de bagagem).
 
+## Ida e volta: o dinheiro que a emissão evita
+
+Numa viagem de ida e volta, emitir um sentido obriga a comprar o outro em dinheiro, e em só-ida. Quando o bilhete de ida e volta sai mais barato que a soma dos dois só-ida, comparar a emissão com o só-ida do seu sentido conta um dinheiro que a pessoa não ia gastar. O lado do dinheiro da fórmula é o que a emissão evita:
+
+- **Os dois sentidos em milhas:** a compra em dinheiro mais barata da viagem (o menor entre o bilhete único e a soma dos dois só-ida), contra a soma das milhas e das taxas dos dois sentidos.
+- **Um sentido só em milhas:** essa compra menos o só-ida do outro sentido, que continua sendo comprado.
+
+Com dois só-ida mais baratos que o bilhete único, o resultado é o próprio só-ida do sentido. O script faz a conta com os três preços: `python3 scripts/milheiro.py --ida-e-volta <ida e volta> --so-ida <só-ida da ida> --so-volta <só-ida da volta> --sentido <ida, volta ou os-dois> --taxas <taxas> --milhas <milhas> --programa <programa>`.
+
+Ordem das contas: cada sentido sozinho. Sentido que passa da régua vai em milhas, e o outro se decide contra o próprio só-ida (`--cash`), porque o desconto do bilhete único já se perdeu. Nenhum passou sozinho: os dois juntos (`--sentido os-dois`, milhas e taxas somadas). Nada passou: dinheiro.
+
+## Ponto de equilíbrio
+
+Quando a emissão vem sem número (o seats.aero escondeu o preço, não acompanha a rota ou não cobre o programa), a conta vira ao contrário:
+
+pontos de equilíbrio = (preço cash − taxas de emissão) ÷ valor da régua × 1.000
+
+Abaixo desse número de pontos, a emissão passa da régua; nele ou acima, o padrão é pagar em dinheiro. É o que a pessoa compara com o que o site do programa pedir. Comando: `python3 scripts/milheiro.py --equilibrio --cash <preço> --taxas <taxas> --programa <programa>`. Com `--taxas desconhecida` o limite sai calculado com taxa zero, e o real é menor. Preço e taxas entram no total do grupo; com `--pax <número de passageiros>` o limite sai por pessoa e no total, pra comparar na mesma base que o site do programa mostrar. Em ida e volta, os três preços entram no lugar de `--cash` e o script devolve os três limites de uma vez (só a ida, só a volta, os dois juntos): `python3 scripts/milheiro.py --equilibrio --ida-e-volta <ida e volta> --so-ida <só-ida da ida> --so-volta <só-ida da volta> --taxas desconhecida --programa <programa> --pax <número de passageiros>`.
+
 ## Regra da moeda (programas não somam)
 
 Pontos de programas diferentes **não somam nem se comparam**. Cada programa é uma moeda com custo e poder de emissão próprios: comparar o milheiro de um programa com o de outro não diz nada, porque as moedas e as entregas são diferentes. Comparação entre programas só existe numa forma: **o custo total em dinheiro da mesma viagem** (milhas × valor da régua + taxas, mesma rota/cabine/datas). Saldos de programas distintos listam-se separados; total, se precisar, em reais.

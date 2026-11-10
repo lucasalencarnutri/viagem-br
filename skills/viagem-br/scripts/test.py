@@ -365,6 +365,322 @@ class TestReguaDaPessoa(unittest.TestCase):
             modulo_milheiro.main()
 
 
+class TestPontoDeEquilibrio(unittest.TestCase):
+    """Emissão sem número (preço escondido, rota não monitorada): até quantos pontos ela ainda passa da régua."""
+    REGUA = Regua({"azul": 14.0, "smiles": 20.0}, HOJE, frozenset({"azul"}))
+
+    def test_conta(self):
+        # (4.264 − 288) ÷ 14 × 1.000 = 284.000
+        self.assertEqual(modulo_milheiro.pontos_de_equilibrio(4264, 288, 14.0), 284000)
+
+    def test_um_ponto_abaixo_passa_da_regua_e_um_acima_nao(self):
+        for cash, taxas, valor in ((4264, 288, 14.0), (8529, 0, 14.0), (5488, 375.89, 16.0), (867, 62.14, 20.5)):
+            with self.subTest(cash=cash, valor=valor):
+                pontos = modulo_milheiro.pontos_de_equilibrio(cash, taxas, valor)
+                self.assertGreater(milheiro(cash, taxas, pontos - 1), valor)
+                self.assertLess(milheiro(cash, taxas, pontos + 1), valor)
+
+    def test_texto_com_valor_da_pessoa(self):
+        res = modulo_milheiro.equilibrio(5000, 1000, "smiles", self.REGUA, HOJE)
+        self.assertIn("menos de 200.000", res)
+        self.assertIn("valor da sua régua (R$ 20,00)", res)
+        self.assertIn("pagar em dinheiro", res)
+        self.assertNotIn("MÉDIA DE REFERÊNCIA", res)
+
+    def test_texto_com_media_avisa(self):
+        res = modulo_milheiro.equilibrio(4264, 288, "azul", self.REGUA, HOJE)
+        self.assertIn("menos de 284.000", res)
+        self.assertIn("média de referência (R$ 14,00)", res)
+        self.assertIn("[MÉDIA DE REFERÊNCIA", res)
+        self.assertNotIn("sua régua", res)
+
+    def test_programa_sem_regua_marca_falta(self):
+        self.assertIn(FALTA_REGUA, modulo_milheiro.equilibrio(4264, 288, "delta", self.REGUA, HOJE))
+
+    def test_taxa_que_come_o_preco_manda_pagar_em_dinheiro(self):
+        for cash, taxas in ((1000, 1000), (1000, 1500)):
+            with self.subTest(taxas=taxas):
+                res = modulo_milheiro.equilibrio(cash, taxas, "smiles", self.REGUA, HOJE)
+                self.assertIn("Pagar em dinheiro", res)
+                self.assertNotIn("menos de", res)
+
+    def test_regua_vencida_pede_reconfirmar(self):
+        velha = Regua({"smiles": 20.0}, HOJE - timedelta(days=91))
+        self.assertIn("[RECONFIRMAR", modulo_milheiro.equilibrio(5000, 1000, "smiles", velha, HOJE))
+
+    def rodar(self, *args):
+        saida = io.StringIO()
+        with mock.patch.object(sys, "argv", ["milheiro.py", *args]), contextlib.redirect_stdout(saida):
+            modulo_milheiro.main()
+        return saida.getvalue()
+
+    def test_linha_de_comando_nao_exige_milhas(self):
+        # régua de fábrica: Azul a R$ 14 (média)
+        saida = self.rodar("--equilibrio", "--cash", "4.264", "--taxas", "288", "--programa", "azul")
+        self.assertIn("menos de 284.000", saida)
+        self.assertIn("[MÉDIA DE REFERÊNCIA", saida)
+
+    def test_linha_de_comando_com_taxa_desconhecida(self):
+        saida = self.rodar("--equilibrio", "--cash", "8529", "--taxas", "desconhecida", "--programa", "azul")
+        self.assertIn("menos de 609.214", saida)
+        self.assertIn("[TAXA DESCONHECIDA", saida)
+        self.assertIn("o limite real é menor", saida)
+        self.assertNotIn("R$ 0,00 de taxas", saida)  # taxa que ninguém sabe não vira zero no texto
+        self.assertIn("sem contar as taxas", saida)
+
+    def test_taxa_desconhecida_na_funcao(self):
+        res = modulo_milheiro.equilibrio(8529, None, "azul", self.REGUA, HOJE)
+        self.assertIn("menos de 609.214", res)
+        self.assertIn("[TAXA DESCONHECIDA", res)
+
+    def test_linha_de_comando_exige_dinheiro_e_taxas(self):
+        with self.assertRaises(SystemExit), contextlib.redirect_stderr(io.StringIO()):
+            self.rodar("--equilibrio", "--programa", "azul")
+
+    def test_com_pax_o_limite_sai_por_pessoa_e_no_total(self):
+        # o Google devolve o total do grupo e o site do programa mostra pontos por pessoa:
+        # limite sem a base dita faz comparar 320 mil por pessoa com 609 mil dos dois
+        res = modulo_milheiro.equilibrio(8529, None, "azul", self.REGUA, HOJE, pax=2)
+        self.assertIn("menos de 304.607 pontos por pessoa", res)
+        self.assertIn("609.214 no total", res)
+        self.assertIn("2 passageiros", res)
+        self.assertIn("Com 304.607 por pessoa ou mais", res)
+
+    def test_limite_por_pessoa_fecha_com_a_conta_do_milheiro(self):
+        for cash, taxas, valor, pax in ((8529, 0, 14.0, 2), (12020, 576.36, 14.0, 2),
+                                        (20000, 1500, 16.0, 4), (867, 62.14, 20.5, 3)):
+            with self.subTest(cash=cash, pax=pax):
+                cada = modulo_milheiro.pontos_de_equilibrio(cash, taxas, valor, pax)
+                self.assertGreater(milheiro(cash, taxas, (cada - 1) * pax), valor)
+                self.assertLess(milheiro(cash, taxas, (cada + 1) * pax), valor)
+
+    def test_um_passageiro_nao_fala_em_por_pessoa(self):
+        res = modulo_milheiro.equilibrio(5000, 1000, "smiles", self.REGUA, HOJE)
+        self.assertNotIn("por pessoa", res)
+        self.assertNotIn("passageiros", res)
+
+    def test_linha_de_comando_com_pax(self):
+        saida = self.rodar("--equilibrio", "--cash", "8529", "--taxas", "desconhecida",
+                           "--programa", "azul", "--pax", "2")
+        self.assertIn("menos de 304.607 pontos por pessoa", saida)
+        self.assertIn("609.214 no total", saida)
+
+    def test_pax_zero_e_erro(self):
+        erro = io.StringIO()
+        with self.assertRaises(SystemExit), contextlib.redirect_stderr(erro):
+            self.rodar("--equilibrio", "--cash", "8529", "--taxas", "0", "--programa", "azul", "--pax", "0")
+        self.assertIn("--pax precisa ser 1 ou mais", erro.getvalue())
+
+    def test_pax_fora_do_equilibrio_e_erro(self):
+        # no cálculo normal quem multiplica pelo PAX é quem chama: aceitar --pax calado dobraria o milheiro
+        erro = io.StringIO()
+        with self.assertRaises(SystemExit), contextlib.redirect_stderr(erro):
+            self.rodar("--cash", "8529", "--taxas", "0", "--milhas", "195000", "--programa", "azul", "--pax", "2")
+        self.assertIn("--pax só vale com --equilibrio", erro.getvalue())
+
+
+
+class TestIdaEVolta(unittest.TestCase):
+    """Ida e volta: o lado do dinheiro é o que a emissão evita, não o só-ida do sentido.
+
+    Emitir um sentido obriga a comprar o outro em só-ida. Quando o bilhete único sai mais barato
+    que dois só-ida, comparar cada emissão com o só-ida do seu sentido superestima as milhas."""
+    ORLANDO = (11699, 7595, 5781)  # VCP⇄MCO, 2 adultos, 2026-11-09: bilhete único mais barato
+    LISBOA = (5488, 2154, 3230)    # SAO⇄LIS, 1 adulto, 2026-11-09: dois só-ida mais baratos
+    RECIFE = (867, 410, 497)       # CGH⇄REC, 1 adulto, 2026-11-09: bilhete único um pouco mais barato
+    REGUA = Regua({"azul": 14.0, "smiles": 20.0}, HOJE, frozenset({"azul"}))
+    VIAGEM = ("--ida-e-volta", "11.699", "--so-ida", "7.595", "--so-volta", "5.781")
+
+    def test_dinheiro_evitado_com_bilhete_unico_mais_barato(self):
+        evitado = modulo_milheiro.dinheiro_evitado
+        self.assertEqual(evitado(*self.ORLANDO, "os-dois"), 11699)
+        self.assertEqual(evitado(*self.ORLANDO, "ida"), 11699 - 5781)
+        self.assertEqual(evitado(*self.ORLANDO, "volta"), 11699 - 7595)
+
+    def test_com_dois_so_ida_mais_baratos_nada_muda(self):
+        evitado = modulo_milheiro.dinheiro_evitado
+        self.assertEqual(evitado(*self.LISBOA, "ida"), 2154)
+        self.assertEqual(evitado(*self.LISBOA, "volta"), 3230)
+        self.assertEqual(evitado(*self.LISBOA, "os-dois"), 2154 + 3230)
+
+    @staticmethod
+    def _custos(viagem, pontos_ida, pontos_volta, valor):
+        """Custo de cada construção, com os pontos valendo a régua."""
+        ida_e_volta, so_ida, so_volta = viagem
+        ida, volta = pontos_ida / 1000 * valor, pontos_volta / 1000 * valor
+        return {"dinheiro": min(ida_e_volta, so_ida + so_volta), "ida": ida + so_volta,
+                "volta": so_ida + volta, "os-dois": ida + volta}
+
+    @staticmethod
+    def _grade(viagem, valor):
+        teto = int(1.5 * min(viagem[0], viagem[1] + viagem[2]) / valor * 1000)
+        return range(teto // 45, teto, teto // 45)
+
+    def test_por_que_o_so_ida_do_sentido_engana(self):
+        # Orlando, ida a 230 mil pontos por pessoa (460 mil os dois), ponto a R$ 14
+        self.assertGreater(milheiro(7595, 0, 460000), 14.0)  # contra o só-ida da ida, mandava emitir
+        custos = self._custos(self.ORLANDO, 460000, 10**9, 14.0)
+        self.assertGreater(custos["ida"], custos["dinheiro"])  # e a viagem saía mais cara que tudo em dinheiro
+        self.assertLess(milheiro(modulo_milheiro.dinheiro_evitado(*self.ORLANDO, "ida"), 0, 460000), 14.0)
+
+    def test_os_tres_limites_dizem_quando_os_pontos_ganham_do_dinheiro(self):
+        valor = 14.0
+        for viagem in (self.ORLANDO, self.LISBOA, self.RECIFE):
+            limite = {s: modulo_milheiro.dinheiro_evitado(*viagem, s) / valor * 1000
+                      for s in ("ida", "volta", "os-dois")}
+            for pontos_ida in self._grade(viagem, valor):
+                for pontos_volta in self._grade(viagem, valor):
+                    custos = self._custos(viagem, pontos_ida, pontos_volta, valor)
+                    ganha = min(custos["ida"], custos["volta"], custos["os-dois"]) < custos["dinheiro"]
+                    diz = (pontos_ida < limite["ida"] or pontos_volta < limite["volta"]
+                           or pontos_ida + pontos_volta < limite["os-dois"])
+                    self.assertEqual(ganha, diz, (viagem, pontos_ida, pontos_volta))
+
+    @staticmethod
+    def _ordem_das_contas(viagem, pontos_ida, pontos_volta, valor):
+        """A ordem que o SKILL.md manda: cada sentido sozinho; com um sentido já em milhas,
+        o outro contra o próprio só-ida; nenhum passou sozinho, os dois juntos."""
+        _, so_ida, so_volta = viagem
+        evitado = modulo_milheiro.dinheiro_evitado
+        ida = milheiro(evitado(*viagem, "ida"), 0, pontos_ida) > valor
+        volta = milheiro(evitado(*viagem, "volta"), 0, pontos_volta) > valor
+        if ida:
+            return "os-dois" if milheiro(so_volta, 0, pontos_volta) > valor else "ida"
+        if volta:
+            return "os-dois" if milheiro(so_ida, 0, pontos_ida) > valor else "volta"
+        if milheiro(evitado(*viagem, "os-dois"), 0, pontos_ida + pontos_volta) > valor:
+            return "os-dois"
+        return "dinheiro"
+
+    def test_a_ordem_das_contas_acha_a_construcao_mais_barata(self):
+        valor = 14.0
+        for viagem in (self.ORLANDO, self.LISBOA, self.RECIFE):
+            for pontos_ida in self._grade(viagem, valor):
+                for pontos_volta in self._grade(viagem, valor):
+                    custos = self._custos(viagem, pontos_ida, pontos_volta, valor)
+                    escolha = self._ordem_das_contas(viagem, pontos_ida, pontos_volta, valor)
+                    self.assertAlmostEqual(custos[escolha], min(custos.values()), places=6,
+                                           msg=(viagem, pontos_ida, pontos_volta, escolha))
+
+    def rodar(self, *args):
+        saida = io.StringIO()
+        with mock.patch.object(sys, "argv", ["milheiro.py", *args]), contextlib.redirect_stdout(saida):
+            modulo_milheiro.main()
+        return saida.getvalue()
+
+    def erro(self, *args):
+        saida = io.StringIO()
+        with self.assertRaises(SystemExit), contextlib.redirect_stderr(saida):
+            self.rodar(*args)
+        return saida.getvalue()
+
+    def test_milheiro_de_um_sentido_usa_o_dinheiro_evitado(self):
+        saida = self.rodar(*self.VIAGEM, "--sentido", "ida", "--milhas", "460000",
+                           "--taxas", "desconhecida", "--programa", "azul")
+        for trecho in ("R$ 12,87/milheiro", "abaixo da média de referência", "[IDA E VOLTA",
+                       "ida e volta num bilhete só, R$ 11.699,00", "os dois só-ida somam R$ 13.376,00",
+                       "Emitindo só a ida", "R$ 5.781,00", "evita R$ 5.918,00", "[TAXA DESCONHECIDA",
+                       # a conta de um sentido sozinho muda se o outro também for em milhas: a saída avisa
+                       "Se a volta também for em milhas", "--cash 7.595,00"):
+            with self.subTest(trecho=trecho):
+                self.assertIn(trecho, saida)
+
+    def test_milheiro_dos_dois_sentidos(self):
+        saida = self.rodar(*self.VIAGEM, "--sentido", "os-dois", "--milhas", "850000", "--taxas", "0",
+                           "--programa", "azul")
+        self.assertIn("R$ 13,76/milheiro", saida)  # 11.699 ÷ 850.000 × 1.000
+        self.assertIn("soma dos dois sentidos", saida)
+        self.assertIn("evita os R$ 11.699,00 inteiros", saida)  # o valor dito, sem "esse valor"
+        self.assertNotIn("também for em milhas", saida)
+
+    def test_dois_so_ida_mais_baratos_diz_isso(self):
+        saida = self.rodar("--ida-e-volta", "5488", "--so-ida", "2154", "--so-volta", "3230",
+                           "--sentido", "ida", "--milhas", "100000", "--taxas", "0", "--programa", "azul")
+        self.assertIn("R$ 21,54/milheiro", saida)
+        self.assertIn("os dois só-ida, R$ 5.384,00", saida)
+        self.assertIn("evita R$ 2.154,00", saida)
+
+    def test_bilhete_unico_mais_barato_que_o_outro_so_ida(self):
+        # ida e volta a R$ 1.000 com a volta em só-ida a R$ 1.200: emitir só a ida nunca compensa
+        saida = self.rodar("--ida-e-volta", "1000", "--so-ida", "900", "--so-volta", "1200",
+                           "--sentido", "ida", "--milhas", "10000", "--taxas", "0", "--programa", "azul")
+        self.assertIn("não compensa com nenhuma quantidade de pontos", saida)
+        self.assertNotIn("/milheiro", saida)
+
+    def test_equilibrio_devolve_os_tres_limites(self):
+        saida = self.rodar("--equilibrio", *self.VIAGEM, "--taxas", "desconhecida", "--programa", "azul",
+                           "--pax", "2")
+        for trecho in ("só a ida em pontos", "menos de 211.357 pontos por pessoa (422.714 no total)",
+                       "só a volta em pontos", "menos de 146.571 pontos por pessoa (293.142 no total)",
+                       "ida e volta em pontos", "menor que 417.821 pontos por pessoa (835.642 no total)",
+                       "ida e volta num bilhete só, R$ 11.699,00", "média de referência (R$ 14,00)",
+                       "[MÉDIA DE REFERÊNCIA", "[TAXA DESCONHECIDA", "2 passageiros", "pagar em dinheiro"):
+            with self.subTest(trecho=trecho):
+                self.assertIn(trecho, saida)
+
+    def test_equilibrio_de_um_recorte_so(self):
+        # contra o voo direto da companhia do programa: só o limite da viagem inteira
+        saida = self.rodar("--equilibrio", "--ida-e-volta", "21329", "--so-ida", "8529", "--so-volta", "12020",
+                           "--sentido", "os-dois", "--taxas", "desconhecida", "--programa", "azul", "--pax", "2")
+        self.assertIn("menor que 733.892 pontos por pessoa", saida)
+        self.assertIn("os dois só-ida, R$ 20.549,00", saida)
+        self.assertNotIn("só a ida em pontos", saida)
+        self.assertNotIn("só a volta em pontos", saida)
+
+    def test_equilibrio_com_dois_so_ida_mais_baratos_bate_com_o_so_ida(self):
+        res = modulo_milheiro.equilibrio_ida_e_volta(*self.LISBOA, "azul", self.REGUA, HOJE)
+        self.assertIn("menos de 153.857 pontos", res)   # 2.154 ÷ 14 × 1.000
+        self.assertIn("menos de 230.714 pontos", res)   # 3.230 ÷ 14 × 1.000
+        self.assertIn("menor que 384.571 pontos", res)  # 5.384 ÷ 14 × 1.000
+        self.assertNotIn("por pessoa", res)
+
+    def test_equilibrio_sem_dinheiro_evitado_num_sentido(self):
+        res = modulo_milheiro.equilibrio_ida_e_volta(1000, 900, 1200, "azul", self.REGUA, HOJE)
+        self.assertIn("só a ida em pontos: não compensa com nenhuma quantidade de pontos", res)
+        self.assertIn("menos de 7.142 pontos", res)  # só a volta: (1.000 − 900) ÷ 14 × 1.000
+
+    def test_equilibrio_programa_sem_regua(self):
+        res = modulo_milheiro.equilibrio_ida_e_volta(*self.ORLANDO, "delta", self.REGUA, HOJE)
+        self.assertIn(FALTA_REGUA, res)
+        self.assertNotIn("menos de", res)
+
+    def test_equilibrio_com_valor_da_pessoa_nao_fala_em_media(self):
+        res = modulo_milheiro.equilibrio_ida_e_volta(*self.ORLANDO, "smiles", self.REGUA, HOJE)
+        self.assertIn("valor da sua régua (R$ 20,00)", res)
+        self.assertNotIn("MÉDIA DE REFERÊNCIA", res)
+
+    def test_equilibrio_de_um_sentido_aceita_taxa(self):
+        saida = self.rodar("--equilibrio", *self.VIAGEM, "--sentido", "ida", "--taxas", "576,36",
+                           "--programa", "azul", "--pax", "2")
+        self.assertIn("menos de 190.772 pontos por pessoa", saida)  # (5.918 − 576,36) ÷ 14 × 1.000 ÷ 2
+        self.assertIn("R$ 576,36 de taxas", saida)
+        self.assertNotIn("[TAXA DESCONHECIDA", saida)
+
+    def test_os_tres_precos_andam_juntos(self):
+        self.assertIn("andam juntos", self.erro("--ida-e-volta", "11699", "--so-ida", "7595", "--sentido", "ida",
+                                                "--milhas", "460000", "--taxas", "0", "--programa", "azul"))
+
+    def test_com_os_tres_precos_nao_vai_cash(self):
+        self.assertIn("não passe --cash", self.erro(*self.VIAGEM, "--cash", "7595", "--sentido", "ida",
+                                                    "--milhas", "460000", "--taxas", "0", "--programa", "azul"))
+
+    def test_milheiro_de_ida_e_volta_exige_o_sentido(self):
+        self.assertIn("--sentido ida, volta ou os-dois",
+                      self.erro(*self.VIAGEM, "--milhas", "460000", "--taxas", "0", "--programa", "azul"))
+
+    def test_sentido_sem_os_tres_precos_e_erro(self):
+        self.assertIn("--sentido pede", self.erro("--cash", "7595", "--sentido", "ida", "--milhas", "460000",
+                                                  "--taxas", "0", "--programa", "azul"))
+
+    def test_tres_limites_so_com_taxa_desconhecida(self):
+        self.assertIn("um sentido por vez",
+                      self.erro("--equilibrio", *self.VIAGEM, "--taxas", "576", "--programa", "azul"))
+
+    def test_preco_zerado_e_erro(self):
+        self.assertIn("maiores que zero", self.erro("--ida-e-volta", "0", "--so-ida", "7595", "--so-volta", "5781",
+                                                    "--sentido", "ida", "--milhas", "460000", "--taxas", "0",
+                                                    "--programa", "azul"))
+
 class TestCambio(unittest.TestCase):
     """Cotação PTAX do Banco Central. Nenhum teste toca a rede."""
     HOJE = date(2026, 11, 9)
@@ -762,13 +1078,56 @@ class TestDocumentacao(unittest.TestCase):
 
     def test_metodo_compara_ida_e_volta_com_dois_so_ida(self):
         skill = self.ler("SKILL.md")
-        for trecho in ("dois só-ida", "conta por sentido", "armadilha 42", "dois bilhetes", "misto"):
+        for trecho in ("dois só-ida", "ordem das contas", "armadilha 42", "dois bilhetes", "misto"):
             with self.subTest(trecho=trecho):
                 self.assertIn(trecho, skill)
         armadilhas = self.ler("references/armadilhas.md")
         for trecho in ("R$ 867", "R$ 5.488", "R$ 2.154"):  # as duas medições de 2026-11-09
             with self.subTest(trecho=trecho):
                 self.assertIn(trecho, armadilhas)
+
+    def test_emissao_sem_numero_ganha_ponto_de_equilibrio(self):
+        # pesquisa de Orlando, 2026-11-09: com o preço escondido, "vale emitir?" ficava sem resposta
+        skill = self.ler("SKILL.md")
+        self.assertGreaterEqual(skill.count("--equilibrio"), 3)  # Passo 7B, bloco MILHAS e PROIBIDO
+        self.assertIn("ponto de equilíbrio", skill)
+        self.assertIn("scripts/milheiro.py --equilibrio", self.ler("references/regua-milheiro.md"))
+        self.assertIn("até quantos pontos", self.ler("README.md"))
+        # a base: o limite sai por pessoa, e o preço em dinheiro que entra é dito
+        for trecho in ("--pax <PAX>", "por pessoa e no total", "os três limites", "no máximo quatro limites"):
+            with self.subTest(trecho=trecho):
+                self.assertIn(trecho, skill)
+        self.assertIn("--pax", self.ler("references/regua-milheiro.md"))
+
+    def test_ajustes_dos_leitores_novos_de_2026_11_10(self):
+        # Campinas⇄Orlando e São Paulo⇄Recife, agentes novos, sem login
+        skill = self.ler("SKILL.md")
+        for trecho in ("é o número da viagem inteira, que vai no veredito",   # os dois passaram sozinhos
+                       "outra companhia com as mesmas paradas não conta",      # o que é "voo melhor"
+                       "explicação fica no fim da célula",                     # o conferidor recusou 2 de 2
+                       "aponta os outros neste bloco",                         # veredito não repete 4 limites
+                       "os três preços desse mesmo voo"):                      # segunda conta, em ida e volta
+            with self.subTest(trecho=trecho):
+                self.assertIn(trecho, skill)
+
+    def test_ida_e_volta_usa_o_dinheiro_que_a_emissao_evita(self):
+        # pesquisa de Orlando, 2026-11-09: bilhete único mais barato que dois só-ida, e a conta
+        # de cada sentido contra o só-ida dele mandava emitir uma viagem mais cara
+        skill = self.ler("SKILL.md")
+        for trecho in ("o que a emissão evita", "--ida-e-volta", "--so-ida", "--so-volta", "`--sentido ida`",
+                       "`os-dois`", "contra o próprio só-ida", "armadilha 43", "mesmo voo da emissão"):
+            with self.subTest(trecho=trecho):
+                self.assertIn(trecho, skill)
+        self.assertNotIn("contra o só-ida em dinheiro do mesmo sentido", skill)  # a regra antiga saiu
+        armadilhas = self.ler("references/armadilhas.md")
+        for trecho in ("\n43. **", "R$ 11.699", "R$ 7.595", "R$ 5.781", "--ida-e-volta"):
+            with self.subTest(trecho=trecho):
+                self.assertIn(trecho, armadilhas)
+        regua = self.ler("references/regua-milheiro.md")
+        for trecho in ("o que a emissão evita", "--ida-e-volta", "--sentido"):
+            with self.subTest(trecho=trecho):
+                self.assertIn(trecho, regua)
+        self.assertIn("dois só-ida", self.ler("MUDANCAS.md").split("## 1.5.0")[0])
 
     def test_ajustes_da_pesquisa_de_orlando(self):
         # pesquisa de ponta a ponta de 2026-11-09, Campinas⇄Orlando, sem login

@@ -19,6 +19,18 @@ Com --estimar, só diz quanto as milhas ficam em reais, mais ou menos, pelo pre�
 referência (o seu, se gravou; senão a média). Programa sem valor marca
 [FALTA: seu preço de referência]. É estimativa e não muda o veredito.
 
+Com --equilibrio, pra emissão que veio sem número (o seats.aero escondeu o preço, não
+acompanha a rota ou não cobre o programa), diz até quantos pontos ela ainda passa da régua:
+(preço cash − taxas) ÷ valor da régua × 1.000. É o que você compara com o site do programa.
+Com --pax, preço e taxas são do grupo inteiro e o limite sai por pessoa e no total.
+
+Em viagem de ida e volta, o lado do dinheiro é o que a emissão evita, e não o só-ida do
+sentido: emitir um sentido obriga a comprar o outro em só-ida, e isso pode custar mais que
+o bilhete único. No lugar de --cash entram os três preços em dinheiro (--ida-e-volta,
+--so-ida e --so-volta) e o que a emissão cobre (--sentido ida, volta ou os-dois). O script
+acha a compra mais barata e desconta o sentido que continua em dinheiro. Com --equilibrio e
+sem --sentido, devolve os três limites de uma vez.
+
 Com --gravar, guarda um valor seu: `regua` é o máximo que você aceita pagar por 1.000
 milhas; `preco` é o que você costuma pagar.
 
@@ -35,9 +47,14 @@ Exemplos:
   milheiro.py --gravar regua smiles 20,50 --gravar preco smiles 18
   milheiro.py --cash 2173 --taxas desconhecida --milhas 96000 --programa smiles
   milheiro.py --cambio USD
+  milheiro.py --equilibrio --cash 4264 --taxas 288 --programa azul
+  milheiro.py --equilibrio --cash 8529 --taxas desconhecida --programa azul --pax 2
+  milheiro.py --ida-e-volta 11699 --so-ida 7595 --so-volta 5781 --sentido ida --milhas 390000 --taxas 576 --programa azul
+  milheiro.py --equilibrio --ida-e-volta 11699 --so-ida 7595 --so-volta 5781 --taxas desconhecida --programa azul --pax 2
 """
 import argparse
 import json
+import math
 import re
 import urllib.error
 import urllib.request
@@ -62,8 +79,13 @@ AVISO_MEDIA = ("[MÉDIA DE REFERÊNCIA: não é o seu custo; grave o seu valor c
                "--gravar regua <programa> <valor>.]")
 TABELAS = {"regua": "valor máximo da sua régua", "preco": "seu preço de referência"}
 TAXA_DESCONHECIDA = "desconhecida"
+SENTIDOS = ("ida", "volta", "os-dois")
+ROTULOS_DO_SENTIDO = {"ida": "só a ida em pontos", "volta": "só a volta em pontos",
+                      "os-dois": "ida e volta em pontos"}
 AVISO_TAXA = ("[TAXA DESCONHECIDA: calculado com taxa zero, então o milheiro real é menor que esse. "
               "Confira a taxa no checkout do programa.]")
+AVISO_TAXA_EQUILIBRIO = ("[TAXA DESCONHECIDA: calculado com taxa zero, então o limite real é menor que esse. "
+                         "Confira a taxa no checkout do programa.]")
 PTAX_URL = ("https://olinda.bcb.gov.br/olinda/servico/PTAX/versao/v1/odata/"
             "CotacaoMoedaPeriodo(moeda=@moeda,dataInicial=@dataInicial,dataFinalCotacao=@dataFinalCotacao)"
             "?@moeda='{moeda}'&@dataInicial='{inicio}'&@dataFinalCotacao='{fim}'&$format=json"
@@ -432,6 +454,170 @@ def comparar(milheiro_calc: float, programa: str, regua: Regua = None, hoje=None
             f"{aviso}{_aviso_validade(regua, chave, hoje)}")
 
 
+def pontos_de_equilibrio(preco_cash: float, taxas: float, valor_regua: float, pax: int = 1) -> int:
+    """Até quantos pontos a emissão ainda passa da régua.
+
+    É a conta do milheiro virada: (preço cash − taxas) ÷ valor da régua × 1.000.
+    Abaixo desse número o milheiro fica acima da régua; nele ou acima, não.
+    Com `pax`, preço e taxas são do grupo e o número sai por pessoa."""
+    return math.floor(round((preco_cash - taxas) / valor_regua * 1000 / pax, 6))
+
+
+def _milhar_br(n: int) -> str:
+    return reais_br(n).split(",")[0]
+
+
+def equilibrio(preco_cash: float, taxas: float, programa: str, regua: Regua = None, hoje=None,
+               pax: int = 1) -> str:
+    """Pra emissão sem número (preço escondido, rota não monitorada, programa fora do seats.aero):
+    o que a pessoa compara com a quantidade de pontos que o site do programa pedir.
+
+    `taxas` None = taxa desconhecida: a conta sai com zero, e o texto avisa que o limite real é menor.
+    `pax` acima de 1: preço e taxas são do grupo, e o limite sai por pessoa e no total, porque o
+    Google devolve o total do grupo e o site do programa pode mostrar os pontos de cada passageiro."""
+    if pax < 1:
+        raise ValueError("--pax precisa ser 1 ou mais")
+    nome = programa.strip()
+    sem_taxa = taxas is None
+    taxas = 0.0 if sem_taxa else taxas
+    if preco_cash - taxas <= 0:
+        return (f"{nome}: as taxas (R$ {reais_br(taxas)}) igualam ou passam o preço em dinheiro "
+                f"(R$ {reais_br(preco_cash)}). Pagar em dinheiro, com qualquer quantidade de pontos.")
+    regua = ler_regua() if regua is None else regua
+    chave = chave_programa(programa)
+    if chave not in regua.valores:
+        return (f"{nome}: {FALTA_REGUA} Sem esse valor não dá pra dizer até quantos pontos a emissão "
+                f"compensa. Pergunte o valor e grave com --gravar regua \"{nome}\" <valor>.")
+    valor = regua.valores[chave]
+    total = _milhar_br(pontos_de_equilibrio(preco_cash, taxas, valor))
+    if pax > 1:
+        cada = _milhar_br(pontos_de_equilibrio(preco_cash, taxas, valor, pax))
+        limite, corte = f"menos de {cada} pontos por pessoa ({total} no total)", f"{cada} por pessoa"
+        base = f" (valores dos {pax} passageiros juntos)"
+    else:
+        limite, corte, base = f"menos de {total} pontos", total, ""
+    if chave in regua.medias:
+        ref, aviso = "da média de referência", " " + AVISO_MEDIA
+    else:
+        ref, aviso = "do valor da sua régua", ""
+    das_taxas = ", sem contar as taxas" if sem_taxa else f" e R$ {reais_br(taxas)} de taxas"
+    if sem_taxa:
+        aviso += " " + AVISO_TAXA_EQUILIBRIO
+    return (f"{nome}: a emissão passa {ref} (R$ {reais_br(valor)}) se pedir {limite}, "
+            f"pra um preço em dinheiro de R$ {reais_br(preco_cash)}{das_taxas}{base}. "
+            f"Com {corte} ou mais, o padrão é pagar em dinheiro."
+            f"{aviso}{_aviso_validade(regua, chave, hoje)}")
+
+
+def dinheiro_evitado(ida_e_volta: float, so_ida: float, so_volta: float, sentido: str) -> float:
+    """Em ida e volta, o que a emissão tira da compra em dinheiro mais barata da viagem.
+
+    Emitir os dois sentidos evita a compra inteira: o menor entre o bilhete único e a soma dos
+    dois só-ida. Emitir um sentido só evita essa compra menos o só-ida do outro sentido, que
+    continua sendo comprado. Com dois só-ida mais baratos, isso dá o próprio só-ida do sentido."""
+    if sentido not in SENTIDOS:
+        raise ValueError(f"sentido desconhecido: {sentido!r} (use ida, volta ou os-dois)")
+    compra = min(ida_e_volta, so_ida + so_volta)
+    if sentido == "os-dois":
+        return compra
+    return compra - (so_volta if sentido == "ida" else so_ida)
+
+
+def _compra_mais_barata(ida_e_volta: float, so_ida: float, so_volta: float) -> str:
+    soma = so_ida + so_volta
+    if ida_e_volta < soma:
+        return (f"é o ida e volta num bilhete só, R$ {reais_br(ida_e_volta)} "
+                f"(os dois só-ida somam R$ {reais_br(soma)})")
+    return (f"são os dois só-ida, R$ {reais_br(soma)} "
+            f"(o ida e volta num bilhete só sai R$ {reais_br(ida_e_volta)})")
+
+
+def _outro_sentido(sentido: str, so_ida: float, so_volta: float):
+    return ("volta", so_volta) if sentido == "ida" else ("ida", so_ida)
+
+
+def _nunca_compensa(sentido: str, ida_e_volta: float, so_ida: float, so_volta: float) -> str:
+    outro, preco = _outro_sentido(sentido, so_ida, so_volta)
+    compra = min(ida_e_volta, so_ida + so_volta)
+    return (f"não compensa com nenhuma quantidade de pontos (a {outro} em só-ida, R$ {reais_br(preco)}, "
+            f"custa o mesmo ou mais que a viagem inteira em dinheiro, R$ {reais_br(compra)})")
+
+
+def _nota_da_viagem(ida_e_volta: float, so_ida: float, so_volta: float, sentido: str) -> str:
+    """Diz de onde saiu o lado do dinheiro, pra conta poder ser refeita."""
+    compra = _compra_mais_barata(ida_e_volta, so_ida, so_volta)
+    if sentido == "os-dois":
+        evitado = dinheiro_evitado(ida_e_volta, so_ida, so_volta, sentido)
+        return (f"[IDA E VOLTA: a compra em dinheiro mais barata {compra}. Emitindo os dois sentidos, a "
+                f"emissão evita os R$ {reais_br(evitado)} inteiros; milhas e taxas são a soma dos dois sentidos.]")
+    outro, preco = _outro_sentido(sentido, so_ida, so_volta)
+    evitado = dinheiro_evitado(ida_e_volta, so_ida, so_volta, sentido)
+    proprio = so_ida if sentido == "ida" else so_volta
+    return (f"[IDA E VOLTA: a compra em dinheiro mais barata {compra}. Emitindo só a {sentido}, a {outro} "
+            f"continua em dinheiro, em só-ida (R$ {reais_br(preco)}): a emissão evita R$ {reais_br(evitado)}. "
+            f"Se a {outro} também for em milhas, a conta desta {sentido} muda: refaça contra o só-ida dela, "
+            f"com --cash {reais_br(proprio)}.]")
+
+
+def equilibrio_ida_e_volta(ida_e_volta: float, so_ida: float, so_volta: float, programa: str,
+                           regua: Regua = None, hoje=None, pax: int = 1, sentido: str = None,
+                           taxas: float = None) -> str:
+    """Ponto de equilíbrio da viagem de ida e volta: até quantos pontos cada construção em milhas
+    ainda ganha da compra em dinheiro mais barata.
+
+    Sem `sentido`, devolve os três limites (só a ida, só a volta, os dois juntos).
+    `taxas` só entra com um `sentido`; None = desconhecida, e o texto avisa que o limite real é menor."""
+    if pax < 1:
+        raise ValueError("--pax precisa ser 1 ou mais")
+    if sentido is None and taxas is not None:
+        raise ValueError("sem --sentido o equilíbrio devolve os três limites e não sabe de qual sentido é a "
+                         "taxa: passe --taxas desconhecida, ou rode um sentido por vez com a taxa dele")
+    nome = programa.strip()
+    regua = ler_regua() if regua is None else regua
+    chave = chave_programa(programa)
+    if chave not in regua.valores:
+        return (f"{nome}: {FALTA_REGUA} Sem esse valor não dá pra dizer até quantos pontos a emissão "
+                f"compensa. Pergunte o valor e grave com --gravar regua \"{nome}\" <valor>.")
+    valor = regua.valores[chave]
+    if chave in regua.medias:
+        ref, aviso = "da média de referência", " " + AVISO_MEDIA
+    else:
+        ref, aviso = "do valor da sua régua", ""
+    sem_taxa = taxas is None
+    desconto = 0.0 if sem_taxa else taxas
+    linhas = []
+    for s in (SENTIDOS if sentido is None else (sentido,)):
+        rotulo = ROTULOS_DO_SENTIDO[s]
+        evitado = dinheiro_evitado(ida_e_volta, so_ida, so_volta, s)
+        if evitado <= 0:
+            linhas.append(f"- {rotulo}: {_nunca_compensa(s, ida_e_volta, so_ida, so_volta)}")
+            continue
+        if evitado - desconto <= 0:
+            linhas.append(f"- {rotulo}: as taxas (R$ {reais_br(desconto)}) igualam ou passam o que a emissão "
+                          f"evita (R$ {reais_br(evitado)}): pagar em dinheiro")
+            continue
+        quanto = f"{_milhar_br(pontos_de_equilibrio(evitado, desconto, valor))} pontos"
+        if pax > 1:
+            cada = _milhar_br(pontos_de_equilibrio(evitado, desconto, valor, pax))
+            quanto = f"{cada} pontos por pessoa ({quanto.split()[0]} no total)"
+        if s == "os-dois":
+            linhas.append(f"- {rotulo}: a soma dos dois sentidos menor que {quanto}")
+        else:
+            outro, preco = _outro_sentido(s, so_ida, so_volta)
+            linhas.append(f"- {rotulo} (a {outro} continua em dinheiro, R$ {reais_br(preco)} em só-ida): "
+                          f"menos de {quanto}")
+    das_taxas = "sem as taxas" if sem_taxa else f"com R$ {reais_br(taxas)} de taxas"
+    if pax > 1:
+        das_taxas = f"com os preços em dinheiro dos {pax} passageiros juntos, {das_taxas}"
+    if sem_taxa:
+        aviso += " " + AVISO_TAXA_EQUILIBRIO
+    return (f"{nome}, ida e volta: a compra em dinheiro mais barata "
+            f"{_compra_mais_barata(ida_e_volta, so_ida, so_volta)}. "
+            f"A emissão passa {ref} (R$ {reais_br(valor)}) se pedir:\n" + "\n".join(linhas)
+            + f"\nNesses números ou acima, o padrão é pagar em dinheiro. Conta feita {das_taxas}."
+            f"{aviso}{_aviso_validade(regua, chave, hoje)}")
+
+
 def main() -> None:
     p = argparse.ArgumentParser(description=__doc__,
                                 formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -450,9 +636,44 @@ def main() -> None:
     p.add_argument("--gravar", nargs=3, action="append", metavar=("TABELA", "PROGRAMA", "VALOR"),
                    help="guarda um valor seu em ~/.viagem-br/regua-milheiro.md. TABELA é regua "
                         "(máximo que aceita pagar) ou preco (o que costuma pagar). Pode repetir")
+    p.add_argument("--equilibrio", action="store_true",
+                   help="pra emissão sem número: diz até quantos pontos ela ainda passa da régua "
+                        "(pede --cash, --taxas e --programa; não usa --milhas)")
+    p.add_argument("--pax", type=int,
+                   help="só com --equilibrio: quantos passageiros o --cash e o --taxas cobrem; "
+                        "o limite sai por pessoa e no total")
+    preco_br = partial(numero_br, eco_milhar=True)
+    p.add_argument("--ida-e-volta", type=preco_br, metavar="R$",
+                   help="viagem de ida e volta: preço em dinheiro do bilhete de ida e volta. Vai com "
+                        "--so-ida e --so-volta, no lugar de --cash")
+    p.add_argument("--so-ida", type=preco_br, metavar="R$",
+                   help="viagem de ida e volta: só-ida em dinheiro da ida")
+    p.add_argument("--so-volta", type=preco_br, metavar="R$",
+                   help="viagem de ida e volta: só-ida em dinheiro da volta")
+    p.add_argument("--sentido", choices=SENTIDOS,
+                   help="viagem de ida e volta: o que a emissão cobre. Em os-dois, milhas e taxas "
+                        "são a soma dos dois sentidos")
     p.add_argument("--cambio", metavar="MOEDA",
                    help="última cotação PTAX do Banco Central da moeda (USD, EUR, CAD...)")
     a = p.parse_args()
+    if a.pax is not None and not a.equilibrio:
+        p.error("--pax só vale com --equilibrio. No cálculo do milheiro, --cash, --taxas e --milhas "
+                "já entram na mesma base de passageiros")
+    viagem = (a.ida_e_volta, a.so_ida, a.so_volta)
+    tem_viagem = any(preco is not None for preco in viagem)
+    if tem_viagem:
+        if None in viagem:
+            p.error("--ida-e-volta, --so-ida e --so-volta andam juntos: são os três preços em dinheiro "
+                    "da viagem")
+        if a.cash is not None:
+            p.error("com os três preços da viagem não passe --cash: o script acha a compra mais barata e "
+                    "desconta o sentido que continua em dinheiro")
+        if min(viagem) <= 0:
+            p.error("os três preços da viagem precisam ser maiores que zero")
+        if a.estimar or a.gravar or a.cambio:
+            p.error("--ida-e-volta, --so-ida e --so-volta só valem no cálculo do milheiro e no --equilibrio")
+    elif a.sentido:
+        p.error("--sentido pede --ida-e-volta, --so-ida e --so-volta")
     if a.cambio:
         try:
             print(cambio(a.cambio))
@@ -468,17 +689,47 @@ def main() -> None:
             except OSError as erro:
                 p.error(f"não consegui gravar em {ARQUIVO_USUARIO}: {erro}")
         return
+    if a.equilibrio:
+        if a.taxas is None or a.programa is None or (a.cash is None and not tem_viagem):
+            p.error("--equilibrio pede --cash, --taxas e --programa "
+                    "(em ida e volta, os três preços da viagem no lugar de --cash)")
+        taxas = None if a.taxas == TAXA_DESCONHECIDA else a.taxas
+        pax = 1 if a.pax is None else a.pax
+        try:
+            if tem_viagem:
+                resultado = equilibrio_ida_e_volta(*viagem, a.programa, pax=pax, sentido=a.sentido, taxas=taxas)
+            else:
+                resultado = equilibrio(a.cash, taxas, a.programa, pax=pax)
+        except ValueError as erro:
+            p.error(str(erro))
+        for eco in ECOS:
+            print(eco)
+        print(resultado)
+        return
     if a.milhas is None or a.programa is None:
-        p.error("--milhas e --programa são obrigatórios (ou use --gravar)")
+        p.error("--milhas e --programa são obrigatórios (ou use --gravar, --equilibrio ou --cambio)")
     desconhecida = a.taxas == TAXA_DESCONHECIDA
     if a.estimar:
         resultado = estimar(a.milhas, a.programa, None if desconhecida else a.taxas)
     else:
-        if a.cash is None or a.taxas is None:
-            p.error("--cash e --taxas são obrigatórios fora do modo --estimar")
+        if a.taxas is None or (a.cash is None and not tem_viagem):
+            p.error("--cash e --taxas são obrigatórios fora do modo --estimar "
+                    "(em ida e volta, os três preços da viagem no lugar de --cash)")
         if a.milhas == 0:
             p.error("--milhas 0 não divide: conferir o valor")
-        resultado = comparar(milheiro(a.cash, 0.0 if desconhecida else a.taxas, a.milhas), a.programa)
+        taxas = 0.0 if desconhecida else a.taxas
+        if tem_viagem:
+            if a.sentido is None:
+                p.error("em ida e volta diga o que a emissão cobre: --sentido ida, volta ou os-dois")
+            evitado = dinheiro_evitado(*viagem, a.sentido)
+            if evitado <= 0:
+                resultado = f"Emitir só a {a.sentido} {_nunca_compensa(a.sentido, *viagem)}. Pagar em dinheiro."
+                desconhecida = False
+            else:
+                resultado = (comparar(milheiro(evitado, taxas, a.milhas), a.programa)
+                             + " " + _nota_da_viagem(*viagem, a.sentido))
+        else:
+            resultado = comparar(milheiro(a.cash, taxas, a.milhas), a.programa)
         if desconhecida:
             resultado += " " + AVISO_TAXA
     for eco in ECOS:

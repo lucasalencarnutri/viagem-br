@@ -8,6 +8,7 @@ Skill é um pacote de instruções que ensina o Claude a fazer uma tarefa sempre
 
 - Preço em dinheiro e em milhas lado a lado, em econômica e executiva, com quantas opções existem em cada caso.
 - Ida e volta comparada com dois só-ida, e a conta feita em cada sentido: às vezes compensa ir em milhas e voltar em dinheiro.
+- Quando o preço em milhas não aparece, ela diz até quantos pontos a emissão ainda compensa, pra você comparar com o site do programa.
 - As datas mais baratas da rota, as conexões e o risco de cada uma.
 - A conta do milheiro de cada emissão: (preço em dinheiro − taxas) ÷ milhas × 1.000. Milheiro é quanto cada 1.000 milhas estão valendo naquela passagem.
 - A comparação com a sua régua, que é o valor máximo que você aceita pagar por 1.000 milhas de cada programa.
