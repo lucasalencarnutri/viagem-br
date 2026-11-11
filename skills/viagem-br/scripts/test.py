@@ -600,6 +600,19 @@ class TestIdaEVolta(unittest.TestCase):
         self.assertIn("os dois só-ida, R$ 5.384,00", saida)
         self.assertIn("evita R$ 2.154,00", saida)
 
+    def test_aviso_de_refazer_a_conta_so_sai_quando_ela_muda(self):
+        # com dois só-ida mais baratos (ou empatados com o bilhete único), o que a emissão de um
+        # sentido evita já é o só-ida dele: mandar refazer com o mesmo número seria ruído
+        for viagem, sentido in (((5488, 2154, 3230), "ida"), ((5384, 2154, 3230), "volta")):
+            with self.subTest(viagem=viagem, sentido=sentido):
+                ida_e_volta, so_ida, so_volta = (str(v) for v in viagem)
+                saida = self.rodar("--ida-e-volta", ida_e_volta, "--so-ida", so_ida, "--so-volta", so_volta,
+                                   "--sentido", sentido, "--milhas", "100000", "--taxas", "0",
+                                   "--programa", "azul")
+                self.assertIn(f"Emitindo só a {sentido}", saida)
+                self.assertNotIn("também for em milhas", saida)
+                self.assertNotIn("--cash", saida)
+
     def test_bilhete_unico_mais_barato_que_o_outro_so_ida(self):
         # ida e volta a R$ 1.000 com a volta em só-ida a R$ 1.200: emitir só a ida nunca compensa
         saida = self.rodar("--ida-e-volta", "1000", "--so-ida", "900", "--so-volta", "1200",
@@ -925,6 +938,12 @@ class TestCliEstimar(unittest.TestCase):
             self.rodar("--milhas", "50000", "--programa", "Smiles")
 
 
+def comandos_de_atualizar(texto):
+    """Os comandos `claude plugin ...` da seção "Atualizar" de um README, na ordem em que aparecem."""
+    secao = texto.split("\n## Atualizar")[1].split("\n## ")[0]
+    return re.findall(r"^claude plugin .+$", secao, re.MULTILINE)
+
+
 class TestDocumentacao(unittest.TestCase):
     ARQUIVOS = ["SKILL.md", "README.md", "MUDANCAS.md", *(f"references/{n}" for n in (
         "hoteis-trivago.md",
@@ -1218,6 +1237,26 @@ class TestDocumentacao(unittest.TestCase):
         # e cada jeito tem a sua atualização
         self.assertIn("claude plugin update viagem-br@viagem-br", readme)
 
+    def test_atualizar_pelo_plugin_busca_o_catalogo_antes(self):
+        # 2026-11-11, Claude Code 2.1.309: `claude plugin update` sozinho não busca o catálogo e
+        # responde que a versão instalada já é a última. Com o catálogo atualizado antes, atualiza.
+        readme = self.ler("README.md")
+        self.assertEqual(comandos_de_atualizar(readme), ["claude plugin marketplace update viagem-br",
+                                                         "claude plugin update viagem-br@viagem-br"])
+        self.assertNotIn("um comando só", readme)
+
+    def test_deu_errado_cobre_quem_atualizou_com_um_comando_so(self):
+        # é o que aparece pra quem seguiu o guia da 1.6.0 ou da 1.6.1
+        deu_errado = self.ler("README.md").split("\n## Deu errado?")[1].split("\n## ")[0]
+        linha = next((l for l in deu_errado.splitlines() if "already at the latest version" in l), "")
+        self.assertIn("`claude plugin marketplace update viagem-br`", linha)
+
+    def test_mudancas_corrigem_o_jeito_de_atualizar_pelo_plugin(self):
+        versoes = {bloco.split(" ")[0]: bloco for bloco in self.ler("MUDANCAS.md").split("\n## ")[1:]}
+        correcao = versoes.get("1.6.2", "")
+        self.assertIn("dois comandos", correcao)
+        self.assertIn("claude plugin marketplace update viagem-br", correcao)
+
     def test_readme_diz_como_chamar_a_skill_em_cada_jeito(self):
         readme = self.ler("README.md")
         self.assertIn("`/viagem-br:viagem-br`", readme)  # pelo plugin, o nome leva o do plugin na frente
@@ -1306,6 +1345,13 @@ class TestPlugin(unittest.TestCase):
         self.assertRegex(self.readme_da_raiz, r"(?m)^/plugin marketplace add [\w.-]+/viagem-br$")
         self.assertRegex(self.readme_da_raiz, r"(?m)^/plugin install viagem-br@viagem-br$")
         self.assertIn("roda o instalador da Viagem BR", self.readme_da_raiz)
+
+    def test_readme_da_raiz_atualiza_pelo_catalogo_antes(self):
+        # o nome depois de `marketplace update` e depois do @ é o do catálogo
+        catalogo = self.json_de(".claude-plugin", "marketplace.json")["name"]
+        self.assertEqual(comandos_de_atualizar(self.readme_da_raiz),
+                         [f"claude plugin marketplace update {catalogo}",
+                          f"claude plugin update {self.manifesto['name']}@{catalogo}"])
 
     def test_endereco_do_repositorio_e_um_so(self):
         guia = (PASTA / "README.md").read_text(encoding="utf-8")

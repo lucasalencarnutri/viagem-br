@@ -44,7 +44,7 @@ Cada um desses serviços é ligado ao Claude por um servidor MCP. MCP é como um
 
 Tem dois jeitos de instalar, e você escolhe um só:
 
-- **Como plugin.** Dois comandos dentro do Claude Code. É o jeito mais curto, e depois a atualização é um comando só.
+- **Como plugin.** Dois comandos dentro do Claude Code. É o jeito mais curto, e depois a atualização são dois comandos no Terminal.
 - **Pelo arquivo `viagem-br.skill`.** Você baixa, descompacta e roda o instalador. Está em "Outro jeito: pelo arquivo", mais abaixo.
 
 O Passo 1 vale pros dois. O login do seats.aero, no Passo 4, é só pra quem tem conta Pro, e é sempre você que faz, no seu navegador.
@@ -224,6 +224,7 @@ Se a skill não entrar sozinha, comece o pedido com `/viagem-br:viagem-br`, se v
 | `command not found: claude` | Feche o Terminal, abra de novo e tente outra vez |
 | O Claude Code não reconhece `/plugin` | Ele está desatualizado. No Terminal, rode `claude update` e tente de novo |
 | A skill não aparece depois de instalar o plugin | Feche o Claude Code com `/exit` e abra de novo |
+| `already at the latest version` ao atualizar o plugin, e o guia mostra uma versão mais nova | Faltou o primeiro comando da seção "Atualizar". Rode `claude plugin marketplace update viagem-br` e depois o de atualizar de novo |
 | `PAROU:` no instalador | Ele diz o que falta logo abaixo. Resolva e rode o instalador de novo |
 | `Unsupported engine` ou `EBADENGINE`, instalando à mão | Seu Node é antigo. Instale a versão LTS em nodejs.org e rode o instalador |
 | `destination path already exists`, instalando à mão | A pasta já existe de uma tentativa anterior. Rode o instalador, que reaproveita a pasta |
@@ -236,13 +237,19 @@ Se a skill não entrar sozinha, comece o pedido com `/viagem-br:viagem-br`, se v
 
 A versão mais nova aparece no começo do guia de instalação. A sua, pergunte pro Claude: "qual versão da Viagem BR eu tenho?". Ela fica no topo do arquivo `MUDANCAS.md` da skill, que pra quem instalou pelo arquivo é `~/.claude/skills/viagem-br/MUDANCAS.md`.
 
-Pelo plugin, rode no Terminal, fora do Claude Code:
+Pelo plugin, rode no Terminal, fora do Claude Code, um comando por vez:
+
+```bash
+claude plugin marketplace update viagem-br
+```
 
 ```bash
 claude plugin update viagem-br@viagem-br
 ```
 
-Depois abra o Claude Code e peça o instalador de novo: ele só refaz o que mudou.
+O primeiro busca no GitHub qual é a versão mais nova. O segundo instala essa versão e mostra de qual pra qual você foi. Sem o primeiro, o segundo responde que você já está na última versão e não atualiza.
+
+Depois abra o Claude Code e peça o instalador de novo: ele só refaz o que mudou. Se o Claude Code ficou aberto durante a atualização, feche com `/exit` e abra de novo antes, porque ele só carrega a versão nova ao abrir.
 
 Pelo arquivo, baixe o arquivo novo, descompacte de novo, como em "Outro jeito: pelo arquivo", e rode o instalador: ele só refaz o que mudou.
 

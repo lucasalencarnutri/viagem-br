@@ -546,17 +546,18 @@ def _nunca_compensa(sentido: str, ida_e_volta: float, so_ida: float, so_volta: f
 def _nota_da_viagem(ida_e_volta: float, so_ida: float, so_volta: float, sentido: str) -> str:
     """Diz de onde saiu o lado do dinheiro, pra conta poder ser refeita."""
     compra = _compra_mais_barata(ida_e_volta, so_ida, so_volta)
+    evitado = dinheiro_evitado(ida_e_volta, so_ida, so_volta, sentido)
     if sentido == "os-dois":
-        evitado = dinheiro_evitado(ida_e_volta, so_ida, so_volta, sentido)
         return (f"[IDA E VOLTA: a compra em dinheiro mais barata {compra}. Emitindo os dois sentidos, a "
                 f"emissão evita os R$ {reais_br(evitado)} inteiros; milhas e taxas são a soma dos dois sentidos.]")
     outro, preco = _outro_sentido(sentido, so_ida, so_volta)
-    evitado = dinheiro_evitado(ida_e_volta, so_ida, so_volta, sentido)
     proprio = so_ida if sentido == "ida" else so_volta
-    return (f"[IDA E VOLTA: a compra em dinheiro mais barata {compra}. Emitindo só a {sentido}, a {outro} "
-            f"continua em dinheiro, em só-ida (R$ {reais_br(preco)}): a emissão evita R$ {reais_br(evitado)}. "
-            f"Se a {outro} também for em milhas, a conta desta {sentido} muda: refaça contra o só-ida dela, "
-            f"com --cash {reais_br(proprio)}.]")
+    nota = (f"[IDA E VOLTA: a compra em dinheiro mais barata {compra}. Emitindo só a {sentido}, a {outro} "
+            f"continua em dinheiro, em só-ida (R$ {reais_br(preco)}): a emissão evita R$ {reais_br(evitado)}.")
+    if evitado < proprio:  # só quando o bilhete único é a compra mais barata a conta do sentido muda
+        nota += (f" Se a {outro} também for em milhas, a conta desta {sentido} muda: refaça contra o só-ida "
+                 f"dela, com --cash {reais_br(proprio)}.")
+    return nota + "]"
 
 
 def equilibrio_ida_e_volta(ida_e_volta: float, so_ida: float, so_volta: float, programa: str,

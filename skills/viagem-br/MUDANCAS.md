@@ -2,6 +2,11 @@
 
 A versão mais nova fica no topo. A versão disponível pra baixar aparece no começo do guia de instalação.
 
+## 1.6.2 (11/11/2026)
+
+- Correção no jeito de atualizar pelo plugin: são dois comandos no Terminal, `claude plugin marketplace update viagem-br` e depois `claude plugin update viagem-br@viagem-br`. O segundo sozinho, que era o que as versões 1.6.0 e 1.6.1 ensinavam, responde que você já está na última versão e não atualiza.
+- Em viagem de ida e volta, a conta de um sentido só trazia sempre o aviso de refazer a conta caso o outro sentido também fosse em milhas. Agora o aviso aparece só quando a conta muda de fato. Com dois só-ida já sendo a compra mais barata ela é a mesma, e o aviso não aparece mais.
+
 ## 1.6.1 (10/11/2026)
 
 - Correção na conta de ida e volta. Quando o bilhete de ida e volta em dinheiro sai mais barato que dois só-ida, comparar cada sentido com o só-ida dele fazia a emissão parecer melhor do que é. A conta passa a usar o dinheiro que a emissão evita de verdade.
