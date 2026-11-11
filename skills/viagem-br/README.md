@@ -247,7 +247,7 @@ claude plugin marketplace update viagem-br
 claude plugin update viagem-br@viagem-br
 ```
 
-O primeiro busca no GitHub qual é a versão mais nova. O segundo instala essa versão e mostra de qual pra qual você foi. Sem o primeiro, o segundo responde que você já está na última versão e não atualiza.
+O primeiro busca no GitHub qual é a versão mais nova. O segundo instala essa versão e mostra de qual pra qual você foi.
 
 Depois abra o Claude Code e peça o instalador de novo: ele só refaz o que mudou. Se o Claude Code ficou aberto durante a atualização, feche com `/exit` e abra de novo antes, porque ele só carrega a versão nova ao abrir.
 

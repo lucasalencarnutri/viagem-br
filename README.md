@@ -52,7 +52,7 @@ claude plugin marketplace update viagem-br
 claude plugin update viagem-br@viagem-br
 ```
 
-O primeiro busca no GitHub qual é a versão mais nova. O segundo instala essa versão. Sem o primeiro, o segundo responde que você já está na última versão e não atualiza.
+O primeiro busca no GitHub qual é a versão mais nova. O segundo instala essa versão.
 
 O que mudou em cada versão está em [MUDANCAS.md](skills/viagem-br/MUDANCAS.md).
 

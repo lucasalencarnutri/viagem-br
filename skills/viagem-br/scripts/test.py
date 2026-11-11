@@ -1238,15 +1238,16 @@ class TestDocumentacao(unittest.TestCase):
         self.assertIn("claude plugin update viagem-br@viagem-br", readme)
 
     def test_atualizar_pelo_plugin_busca_o_catalogo_antes(self):
-        # 2026-11-11, Claude Code 2.1.309: `claude plugin update` sozinho não busca o catálogo e
-        # responde que a versão instalada já é a última. Com o catálogo atualizado antes, atualiza.
+        # 2026-11-11, Claude Code 2.1.309: `claude plugin update` sozinho busca o catálogo de novo, menos quando
+        # ele foi baixado há poucos minutos; aí responde que a versão instalada já é a última. Com o catálogo
+        # atualizado antes, a versão nova sempre aparece.
         readme = self.ler("README.md")
         self.assertEqual(comandos_de_atualizar(readme), ["claude plugin marketplace update viagem-br",
                                                          "claude plugin update viagem-br@viagem-br"])
         self.assertNotIn("um comando só", readme)
 
     def test_deu_errado_cobre_quem_atualizou_com_um_comando_so(self):
-        # é o que aparece pra quem seguiu o guia da 1.6.0 ou da 1.6.1
+        # aparece quando o catálogo tinha sido baixado poucos minutos antes de sair a versão nova
         deu_errado = self.ler("README.md").split("\n## Deu errado?")[1].split("\n## ")[0]
         linha = next((l for l in deu_errado.splitlines() if "already at the latest version" in l), "")
         self.assertIn("`claude plugin marketplace update viagem-br`", linha)
@@ -1256,6 +1257,15 @@ class TestDocumentacao(unittest.TestCase):
         correcao = versoes.get("1.6.2", "")
         self.assertIn("dois comandos", correcao)
         self.assertIn("claude plugin marketplace update viagem-br", correcao)
+
+    def test_atualizar_nao_diz_que_o_comando_sozinho_nunca_atualiza(self):
+        # 2026-11-11, pelo GitHub real: o comando sozinho também busca o catálogo e atualiza, menos quando
+        # o catálogo foi baixado há poucos minutos. A 1.6.2 dizia que ele não atualiza.
+        secao = self.ler("README.md").split("\n## Atualizar")[1].split("\n## ")[0]
+        self.assertNotIn("não atualiza", secao)
+        versoes = {bloco.split(" ")[0]: bloco for bloco in self.ler("MUDANCAS.md").split("\n## ")[1:]}
+        self.assertNotIn("não atualiza", versoes["1.6.2"])
+        self.assertIn("poucos minutos", versoes.get("1.6.3", ""))
 
     def test_readme_diz_como_chamar_a_skill_em_cada_jeito(self):
         readme = self.ler("README.md")
@@ -1352,6 +1362,10 @@ class TestPlugin(unittest.TestCase):
         self.assertEqual(comandos_de_atualizar(self.readme_da_raiz),
                          [f"claude plugin marketplace update {catalogo}",
                           f"claude plugin update {self.manifesto['name']}@{catalogo}"])
+
+    def test_readme_da_raiz_nao_diz_que_o_comando_sozinho_nunca_atualiza(self):
+        secao = self.readme_da_raiz.split("\n## Atualizar")[1].split("\n## ")[0]
+        self.assertNotIn("não atualiza", secao)
 
     def test_endereco_do_repositorio_e_um_so(self):
         guia = (PASTA / "README.md").read_text(encoding="utf-8")

@@ -2,9 +2,13 @@
 
 A versão mais nova fica no topo. A versão disponível pra baixar aparece no começo do guia de instalação.
 
+## 1.6.3 (11/11/2026)
+
+- Correção no texto sobre atualizar pelo plugin. A 1.6.2 dizia que `claude plugin update viagem-br@viagem-br` sozinho não atualiza. Ele atualiza, porque também busca no GitHub qual é a versão mais nova, menos quando essa busca foi feita poucos minutos antes. Os dois comandos continuam sendo o jeito recomendado: com o primeiro antes, a versão nova sempre aparece.
+
 ## 1.6.2 (11/11/2026)
 
-- Correção no jeito de atualizar pelo plugin: são dois comandos no Terminal, `claude plugin marketplace update viagem-br` e depois `claude plugin update viagem-br@viagem-br`. O segundo sozinho, que era o que as versões 1.6.0 e 1.6.1 ensinavam, responde que você já está na última versão e não atualiza.
+- Atualizar pelo plugin passa a ser ensinado com dois comandos no Terminal: `claude plugin marketplace update viagem-br` e depois `claude plugin update viagem-br@viagem-br`. O primeiro busca no GitHub qual é a versão mais nova.
 - Em viagem de ida e volta, a conta de um sentido só trazia sempre o aviso de refazer a conta caso o outro sentido também fosse em milhas. Agora o aviso aparece só quando a conta muda de fato. Com dois só-ida já sendo a compra mais barata ela é a mesma, e o aviso não aparece mais.
 
 ## 1.6.1 (10/11/2026)
